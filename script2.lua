@@ -293,59 +293,138 @@ function FullBright:Disable() if not self.Enabled then return end self.Enabled =
 
 -- AutoFarm
 function AutoFarm:Enable()
-    if self.Enabled then return end self.Enabled = true Settings.AUTO.AutoFarm = true SaveAllSettings() self.CurrentStage = 1 self.IsTeleporting = false self.IsWalking = true self.WalkTimer = 0
+    if self.Enabled then return end 
+    self.Enabled = true 
+    Settings.AUTO.AutoFarm = true 
+    SaveAllSettings() 
+    self.CurrentStage = 1 
+    self.IsTeleporting = false 
+    self.IsWalking = true 
+    self.WalkTimer = 0
+    
     game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Немного хожу перед запуском цикла...", Duration = 3})
+    
     task.spawn(function()
         while self.Enabled and self.IsWalking do
             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
-            if math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.A, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
-            elseif math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.D, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game) end
+            if math.random(1, 50) == 1 then 
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.A, false, game) 
+                task.wait(0.3) 
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
+            elseif math.random(1, 50) == 1 then 
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.D, false, game) 
+                task.wait(0.3) 
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game) 
+            end
             task.wait(0.1)
         end
         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
     end)
+    
     self.Connection = RunService.Heartbeat:Connect(function(dt)
         if not self.Enabled or self.IsTeleporting then return end
-        local char = Player.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChild("Humanoid")
+        local char = Player.Character 
+        local root = char and char:FindFirstChild("HumanoidRootPart") 
+        local hum = char and char:FindFirstChild("Humanoid")
         if not root or not hum then return end
+        
         if self.IsWalking then
             self.WalkTimer += dt
-            if self.WalkTimer < 3 then return
-            else self.IsWalking = false self.WalkTimer = 0
-                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
+            if self.WalkTimer < 3 then 
+                return
+            else 
+                self.IsWalking = false 
+                self.WalkTimer = 0
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) 
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) 
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) 
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
                 game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Запускаю цикл фарма!", Duration = 3})
             end
         end
+        
         if not self.IsWalking then
-            self.IsTeleporting = true workspace.Gravity = 0
+            self.IsTeleporting = true 
+            workspace.Gravity = 0
+            
             if self.CurrentStage <= 10 then
                 local tp = self:FindStage(self.CurrentStage)
-                if tp then root.CFrame = tp.CFrame + Vector3.new(0,3,0) task.wait(1.5) self.CurrentStage += 1
-                else task.wait(0.5) self.CurrentStage += 1 end
+                if tp then 
+                    root.CFrame = tp.CFrame + Vector3.new(0,3,0) 
+                    task.wait(1.5) 
+                    self.CurrentStage += 1
+                else 
+                    task.wait(0.5) 
+                    self.CurrentStage += 1 
+                end
+                workspace.Gravity = 196.2 
+                self.IsTeleporting = false
             else
                 local chest = self:FindGoldenChest()
                 if chest then
-                    root.CFrame = chest.CFrame + Vector3.new(0,3,0)
+                    -- Включаем гравитацию ДО телепортации к сундуку
+                    workspace.Gravity = 196.2
+                    root.CFrame = chest.CFrame + Vector3.new(0,5,0)
+                    task.wait(2) -- Ждем пока персонаж упадет
+                    
                     local trigger = chest:FindFirstChild("Trigger")
-                    if trigger then if trigger:IsA("BasePart") then root.CFrame = trigger.CFrame + Vector3.new(0,2,0) task.wait(0.5) if trigger:IsA("ProximityPrompt") then fireproximityprompt(trigger) end end end
-                    task.wait(15) self.CurrentStage = 1 self.IsWalking = true self.WalkTimer = 0
+                    if trigger and trigger:IsA("BasePart") then 
+                        root.CFrame = trigger.CFrame + Vector3.new(0,3,0) 
+                        task.wait(1) 
+                    elseif trigger and trigger:IsA("ProximityPrompt") then 
+                        fireproximityprompt(trigger) 
+                    end
+                    
+                    task.wait(15) 
+                    self.CurrentStage = 1 
+                    self.IsWalking = true 
+                    self.WalkTimer = 0
+                    self.IsTeleporting = false
+                    
                     task.spawn(function()
                         while self.Enabled and self.IsWalking do
                             VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
-                            if math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.A, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
-                            elseif math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.D, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game) end
+                            if math.random(1, 50) == 1 then 
+                                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.A, false, game) 
+                                task.wait(0.3) 
+                                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
+                            elseif math.random(1, 50) == 1 then 
+                                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.D, false, game) 
+                                task.wait(0.3) 
+                                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game) 
+                            end
                             task.wait(0.1)
                         end
                         VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
                     end)
-                else task.wait(5) self.CurrentStage = 1 self.IsWalking = true self.WalkTimer = 0 end
+                else 
+                    task.wait(5) 
+                    self.CurrentStage = 1 
+                    self.IsWalking = true 
+                    self.WalkTimer = 0
+                    self.IsTeleporting = false
+                end
+                workspace.Gravity = 196.2
             end
-            workspace.Gravity = 196.2 self.IsTeleporting = false
         end
     end)
-    Player.CharacterAdded:Connect(function() if self.Enabled then workspace.Gravity = 0 self.CurrentStage = 1 self.IsWalking = true self.WalkTimer = 0
-        task.spawn(function() while self.Enabled and self.IsWalking do VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game) task.wait(0.1) end VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) end)
-    end end)
+    
+    Player.CharacterAdded:Connect(function() 
+        if self.Enabled then 
+            workspace.Gravity = 0 
+            self.CurrentStage = 1 
+            self.IsWalking = true 
+            self.WalkTimer = 0
+            self.IsTeleporting = false
+            task.spawn(function() 
+                while self.Enabled and self.IsWalking do 
+                    VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game) 
+                    task.wait(0.1) 
+                end 
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) 
+            end)
+        end 
+    end)
 end
 
 function AutoFarm:FindStage(num)
@@ -372,9 +451,22 @@ function AutoFarm:FindGoldenChest()
     return goldenChest
 end
 
-function AutoFarm:Disable() if not self.Enabled then return end self.Enabled = false Settings.AUTO.AutoFarm = false SaveAllSettings() self.IsTeleporting = false self.CurrentStage = 1 self.IsWalking = false self.WalkTimer = 0
-    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
-    if self.Connection then self.Connection:Disconnect() end workspace.Gravity = 196.2 end
+function AutoFarm:Disable() 
+    if not self.Enabled then return end 
+    self.Enabled = false 
+    Settings.AUTO.AutoFarm = false 
+    SaveAllSettings() 
+    self.IsTeleporting = false 
+    self.CurrentStage = 1 
+    self.IsWalking = false 
+    self.WalkTimer = 0
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) 
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) 
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) 
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
+    if self.Connection then self.Connection:Disconnect() end 
+    workspace.Gravity = 196.2 
+end
 
 -- FPS Window
 local function CreateFPSWindow()
@@ -617,8 +709,6 @@ function Menu:AddScriptItems()
     local item = {Frame = Frame, Height = ItemHeight, ToggleFunction = function() end, SetState = function() end, GetState = function() return false end}
     table.insert(self.Items, item) table.insert(self.AllItems, item) self:UpdateSize()
 end
-
-
 
 function Menu:AddSettingsItems()
     -- 📏 Размер меню
