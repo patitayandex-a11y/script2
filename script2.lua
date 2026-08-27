@@ -1,0 +1,701 @@
+-- // ПОЛНЫЙ КОД С ПЕРЕТАСКИВАЕМЫМИ PHON КНОПКАМИ
+-- // BoatHelper - Premium Dark-Gray Menu with Beautiful UI and All Functions + FPS Window + Binds + PHON + Menu Button
+local Players = game:GetService("Players")
+local Player = Players.LocalPlayer
+local Mouse = Player:GetMouse()
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local HttpService = game:GetService("HttpService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+
+local MenuName = "BoatHelper"
+local MenuWidth = 650
+local HeaderHeight = 55
+local TabHeight = 50
+local ItemHeight = 65
+local Spacing = 8
+local MaxVisibleHeight = 650
+
+local C = {
+    BG = Color3.fromRGB(18, 18, 22),
+    Header = Color3.fromRGB(28, 28, 36),
+    HeaderGradient = Color3.fromRGB(35, 35, 45),
+    Tab = Color3.fromRGB(22, 22, 28),
+    TabActive = Color3.fromRGB(40, 40, 55),
+    Item = Color3.fromRGB(30, 30, 38),
+    Hover = Color3.fromRGB(45, 45, 58),
+    Text = Color3.fromRGB(170, 170, 190),
+    Bright = Color3.fromRGB(240, 240, 255),
+    On = Color3.fromRGB(0, 200, 120),
+    Off = Color3.fromRGB(50, 50, 65),
+    Divider = Color3.fromRGB(45, 45, 55),
+    Danger = Color3.fromRGB(200, 50, 50),
+    DangerHover = Color3.fromRGB(230, 60, 60),
+    Accent = Color3.fromRGB(80, 80, 120),
+    SliderFill = Color3.fromRGB(0, 180, 110),
+    ScrollBar = Color3.fromRGB(70, 70, 90),
+    ArrowBG = Color3.fromRGB(55, 55, 75),
+    BindBG = Color3.fromRGB(50, 50, 80),
+}
+
+local Settings = {
+    ESP = {Enabled = false, ShowNames = false, ShowDistance = false, ShowHealth = false, Tracers = false, Expanded = false},
+    Aimbot = {Enabled = false, TargetBone = "Head", FOV = 180, Smooth = 15, RCSEnabled = false, RCSStrength = 0.5, ShowFOV = true, VisibleCheck = true, TeamCheck = true, TargetPriority = "Distance", Expanded = false},
+    MISC = {Fly = {Enabled = false, Speed = 50, Expanded = false}, Noclip = false, SpeedHack = {Enabled = false, Multiplier = 2, Expanded = false}, FullBright = false},
+    AUTO = {AutoFarm = false},
+    PHON = {ESPKey = false, AimbotKey = false, FlyKey = false, NoclipKey = false, SpeedKey = false, AutoFarmKey = false}
+}
+
+local function SaveAllSettings()
+    pcall(function()
+        local json = HttpService:JSONEncode(Settings)
+        if writefile then writefile("BoatHelper_Settings.json", json) end
+    end)
+end
+
+local function LoadAllSettings()
+    pcall(function()
+        if readfile then
+            local data = readfile("BoatHelper_Settings.json")
+            local decoded = HttpService:JSONDecode(data)
+            for key, value in pairs(decoded) do
+                if Settings[key] then Settings[key] = value end
+            end
+        end
+    end)
+end
+
+LoadAllSettings()
+
+local Menu = {Gui = nil, MainFrame = nil, ItemsContainer = nil, Items = {}, Dragging = false, DragOffset = Vector2.new(0,0), IsOpen = true, FunctionsEnabled = true, CurrentTab = "ESP", TabButtons = {}, ScrollFrame = nil, SliderConnections = {}, WaitingForBind = nil, AllItems = {}}
+
+local TabStates = {
+    ESP = {ESPEnabled = Settings.ESP.Enabled, ESPExpanded = Settings.ESP.Expanded, ShowNames = Settings.ESP.ShowNames, ShowDistance = Settings.ESP.ShowDistance, ShowHealth = Settings.ESP.ShowHealth, TracersEnabled = Settings.ESP.Tracers},
+    AIMBOT = {AimbotEnabled = Settings.Aimbot.Enabled, AimbotExpanded = Settings.Aimbot.Expanded},
+    MISC = {FlyEnabled = Settings.MISC.Fly.Enabled, FlySpeed = Settings.MISC.Fly.Speed, FlyExpanded = Settings.MISC.Fly.Expanded, SpeedHackMultiplier = Settings.MISC.SpeedHack.Multiplier, SpeedHackExpanded = Settings.MISC.SpeedHack.Expanded},
+    AUTO = {AutoFarmEnabled = Settings.AUTO.AutoFarm, AutoFarmExpanded = false},
+    PLAYER = {},
+    SCRIPT = {InfiniteYieldEnabled = false},
+    PHON = {ESPKey = Settings.PHON.ESPKey, AimbotKey = Settings.PHON.AimbotKey, FlyKey = Settings.PHON.FlyKey, NoclipKey = Settings.PHON.NoclipKey, SpeedKey = Settings.PHON.SpeedKey, AutoFarmKey = Settings.PHON.AutoFarmKey},
+}
+
+local ESP = {Enabled = Settings.ESP.Enabled, Highlights = {}, Connections = {}, ShowNames = Settings.ESP.ShowNames, ShowDistance = Settings.ESP.ShowDistance, ShowHealth = Settings.ESP.ShowHealth, NameLabels = {}, DistanceLabels = {}, HealthLabels = {}}
+local Tracers = {Enabled = Settings.ESP.Tracers, Lines = {}, Connection = nil}
+local AimbotSettings = {Enabled = Settings.Aimbot.Enabled, TargetBone = Settings.Aimbot.TargetBone, FOV = Settings.Aimbot.FOV, ShowFOV = Settings.Aimbot.ShowFOV, FOVCircle = nil, Smooth = Settings.Aimbot.Smooth, RCSEnabled = Settings.Aimbot.RCSEnabled, RCSStrength = Settings.Aimbot.RCSStrength, TargetPriority = Settings.Aimbot.TargetPriority, VisibleCheck = Settings.Aimbot.VisibleCheck, TeamCheck = Settings.Aimbot.TeamCheck, IgnoreDead = true, Connection = nil}
+local FlySystem = {Enabled = Settings.MISC.Fly.Enabled, Speed = Settings.MISC.Fly.Speed, Connection = nil}
+local Noclip = {Enabled = Settings.MISC.Noclip, Connection = nil}
+local SpeedHack = {Enabled = Settings.MISC.SpeedHack.Enabled, Multiplier = Settings.MISC.SpeedHack.Multiplier, OriginalSpeed = 16}
+local FullBright = {Enabled = Settings.MISC.FullBright, OriginalBrightness = 2, OriginalClockTime = 14, OriginalAmbient = nil}
+local AutoFarm = {Enabled = Settings.AUTO.AutoFarm, Connection = nil, CurrentStage = 1, IsTeleporting = false, IsWalking = false, WalkTimer = 0}
+local FPSWindow = {Gui = nil, Frame = nil, Dragging = false, DragOffset = Vector2.new(0,0)}
+local MenuButton = {Gui = nil, Button = nil, Dragging = false, DragOffset = Vector2.new(0,0)}
+
+-- ESP Functions
+function ESP:Enable() if self.Enabled then return end self.Enabled = true self:UpdateESP() Settings.ESP.Enabled = true SaveAllSettings() end
+function ESP:Disable() if not self.Enabled then return end self.Enabled = false self:ClearESP() Settings.ESP.Enabled = false SaveAllSettings() end
+function ESP:UpdateESP()
+    self:ClearESP() if not self.Enabled then return end
+    for _, p in pairs(Players:GetPlayers()) do if p ~= Player then self:AddESPToPlayer(p) end end
+    local c1 = Players.PlayerAdded:Connect(function(p) if self.Enabled and p ~= Player then p.CharacterAdded:Connect(function() task.wait(0.5) self:AddESPToPlayer(p) end) end end)
+    local c2 = Players.PlayerRemoving:Connect(function(p) self:RemoveESPFromPlayer(p) end)
+    table.insert(self.Connections, c1) table.insert(self.Connections, c2)
+    if self.ShowDistance then local c3 = RunService.RenderStepped:Connect(function() if self.Enabled then self:UpdateDistances() end end) table.insert(self.Connections, c3) end
+end
+function ESP:ClearESP()
+    for _, h in pairs(self.Highlights) do if h then h:Destroy() end end self.Highlights = {}
+    for _, l in pairs(self.NameLabels) do if l then l:Destroy() end end self.NameLabels = {}
+    for _, d in pairs(self.DistanceLabels) do if d then d.Billboard:Destroy() end end self.DistanceLabels = {}
+    for _, h in pairs(self.HealthLabels) do if h then h.Billboard:Destroy() end end self.HealthLabels = {}
+    for _, c in pairs(self.Connections) do c:Disconnect() end self.Connections = {}
+end
+function ESP:AddESPToPlayer(p)
+    if p == Player then return end local char = p.Character if not char then return end
+    local hl = Instance.new("Highlight") hl.FillColor = Color3.fromRGB(255,0,0) hl.OutlineColor = Color3.fromRGB(255,255,255) hl.FillTransparency = 0.5 hl.Parent = char self.Highlights[p] = hl
+    local head = char:FindFirstChild("Head") if not head then return end
+    if self.ShowNames then
+        local bb = Instance.new("BillboardGui") bb.Size = UDim2.new(0,100,0,30) bb.StudsOffset = Vector3.new(0,2.5,0) bb.AlwaysOnTop = true bb.Parent = head
+        local tl = Instance.new("TextLabel") tl.Size = UDim2.new(1,0,1,0) tl.BackgroundTransparency = 1 tl.Text = p.Name tl.TextColor3 = Color3.fromRGB(255,255,255) tl.Font = Enum.Font.Code tl.TextSize = 14 tl.Parent = bb
+        self.NameLabels[p] = bb
+    end
+    if self.ShowDistance then
+        local bb = Instance.new("BillboardGui") bb.Size = UDim2.new(0,100,0,30) bb.StudsOffset = Vector3.new(0,-2.5,0) bb.AlwaysOnTop = true bb.Parent = head
+        local tl = Instance.new("TextLabel") tl.Size = UDim2.new(1,0,1,0) tl.BackgroundTransparency = 1 tl.Text = "0m" tl.TextColor3 = Color3.fromRGB(255,200,0) tl.Font = Enum.Font.Code tl.TextSize = 12 tl.Parent = bb
+        self.DistanceLabels[p] = {Billboard = bb, TextLabel = tl}
+    end
+    if self.ShowHealth then
+        local hum = char:FindFirstChild("Humanoid")
+        if hum then
+            local bb = Instance.new("BillboardGui") bb.Size = UDim2.new(0,100,0,30) bb.AlwaysOnTop = true bb.Parent = head
+            local tl = Instance.new("TextLabel") tl.Size = UDim2.new(1,0,1,0) tl.BackgroundTransparency = 1 tl.Text = "HP: "..math.floor(hum.Health) tl.TextColor3 = Color3.fromRGB(0,255,0) tl.Font = Enum.Font.Code tl.TextSize = 12 tl.Parent = bb
+            self.HealthLabels[p] = {Billboard = bb, TextLabel = tl}
+            hum.HealthChanged:Connect(function(h) if self.HealthLabels[p] then self.HealthLabels[p].TextLabel.Text = "HP: "..math.floor(h) end end)
+        end
+    end
+end
+function ESP:RemoveESPFromPlayer(p)
+    if self.Highlights[p] then self.Highlights[p]:Destroy() self.Highlights[p] = nil end
+    if self.NameLabels[p] then self.NameLabels[p]:Destroy() self.NameLabels[p] = nil end
+    if self.DistanceLabels[p] then self.DistanceLabels[p].Billboard:Destroy() self.DistanceLabels[p] = nil end
+    if self.HealthLabels[p] then self.HealthLabels[p].Billboard:Destroy() self.HealthLabels[p] = nil end
+end
+function ESP:UpdateDistances()
+    local pc = Player.Character local pr = pc and pc:FindFirstChild("HumanoidRootPart") if not pr then return end
+    for p, d in pairs(self.DistanceLabels) do local tc = p.Character local tr = tc and tc:FindFirstChild("HumanoidRootPart") if tr and d then d.TextLabel.Text = math.floor((pr.Position - tr.Position).Magnitude).."m" end end
+end
+function ESP:SetShowNames(v) self.ShowNames = v Settings.ESP.ShowNames = v SaveAllSettings() if self.Enabled then self:UpdateESP() end end
+function ESP:SetShowDistance(v) self.ShowDistance = v Settings.ESP.ShowDistance = v SaveAllSettings() if self.Enabled then self:UpdateESP() end end
+function ESP:SetShowHealth(v) self.ShowHealth = v Settings.ESP.ShowHealth = v SaveAllSettings() if self.Enabled then self:UpdateESP() end end
+
+-- Tracers
+function Tracers:Enable() if self.Enabled then return end self.Enabled = true Settings.ESP.Tracers = true SaveAllSettings() self.Connection = RunService.RenderStepped:Connect(function() if self.Enabled then self:UpdateTracers() end end) end
+function Tracers:Disable() if not self.Enabled then return end self.Enabled = false Settings.ESP.Tracers = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end self:ClearLines() end
+function Tracers:ClearLines() for _, l in pairs(self.Lines) do if l then l:Destroy() end end self.Lines = {} end
+function Tracers:UpdateTracers()
+    self:ClearLines()
+    local cam = workspace.CurrentCamera local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+    local sg = Player:WaitForChild("PlayerGui"):FindFirstChild("TracerContainer")
+    if not sg then sg = Instance.new("ScreenGui") sg.Name = "TracerContainer" sg.Parent = Player:WaitForChild("PlayerGui") sg.ResetOnSpawn = false end
+    for _, p in pairs(Players:GetPlayers()) do if p ~= Player then
+        local char = p.Character local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then local sp = cam:WorldToScreenPoint(root.Position)
+            if sp.Z > 0 then
+                local line = Instance.new("Frame") line.BackgroundColor3 = Color3.fromRGB(255,0,0) line.BorderSizePixel = 0 line.AnchorPoint = Vector2.new(0,0.5) line.Parent = sg
+                local dist = (Vector2.new(sp.X,sp.Y) - center).Magnitude local angle = math.deg(math.atan2(sp.Y-center.Y, sp.X-center.X))
+                line.Size = UDim2.new(0,dist,0,2) line.Position = UDim2.new(0,center.X,0,center.Y) line.Rotation = angle
+                self.Lines[p] = line
+            end
+        end
+    end end
+end
+
+-- Aimbot
+function GetTargetPart(char, bone)
+    if bone == "Head" then return char:FindFirstChild("Head")
+    elseif bone == "Neck" then return char:FindFirstChild("Neck") or char:FindFirstChild("UpperTorso")
+    elseif bone == "Chest" then return char:FindFirstChild("UpperTorso") or char:FindFirstChild("HumanoidRootPart")
+    elseif bone == "Closest" then
+        local cam = workspace.CurrentCamera local closest = nil local cd = math.huge
+        for _, part in pairs(char:GetChildren()) do if part:IsA("BasePart") then local sp = cam:WorldToScreenPoint(part.Position) local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2) local d = (Vector2.new(sp.X,sp.Y)-center).Magnitude if sp.Z > 0 and d < cd then cd = d closest = part end end end
+        return closest
+    end
+    return char:FindFirstChild("Head")
+end
+function IsTargetVisible(tp)
+    if not AimbotSettings.VisibleCheck then return true end
+    local pc = Player.Character local ph = pc and pc:FindFirstChild("Head") if not ph then return true end
+    local rp = RaycastParams.new() rp.FilterDescendantsInstances = {pc} rp.FilterType = Enum.RaycastFilterType.Blacklist
+    local dir = (tp.Position - ph.Position).Unit local dist = (tp.Position - ph.Position).Magnitude
+    local result = workspace:Raycast(ph.Position, dir * dist, rp)
+    if result then local tm = tp:FindFirstAncestorOfClass("Model") if tm and result.Instance:IsDescendantOf(tm) then return true end return false end
+    return true
+end
+function GetValidTargets()
+    local targets = {}
+    for _, p in pairs(Players:GetPlayers()) do if p ~= Player then
+        local char = p.Character if not char then continue end
+        local hum = char:FindFirstChild("Humanoid") if not hum then continue end
+        if AimbotSettings.IgnoreDead and hum.Health <= 0 then continue end
+        if AimbotSettings.TeamCheck and p.Team == Player.Team then continue end
+        local tp = GetTargetPart(char, AimbotSettings.TargetBone) if not tp then continue end
+        if AimbotSettings.VisibleCheck and not IsTargetVisible(tp) then continue end
+        table.insert(targets, {Part = tp, Humanoid = hum})
+    end end
+    return targets
+end
+function SelectBestTarget()
+    local targets = GetValidTargets() 
+    if #targets == 0 then return nil end
+    local cam = workspace.CurrentCamera 
+    local center = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+    local best = nil 
+    local bestDistance = math.huge
+    local fovPx = (AimbotSettings.FOV / 90) * (cam.ViewportSize.Y / 2) * 2.5
+    for _, t in pairs(targets) do 
+        local sp = cam:WorldToScreenPoint(t.Part.Position) 
+        if sp.Z > 0 then 
+            local screenPos = Vector2.new(sp.X, sp.Y)
+            local distFromCenter = (screenPos - center).Magnitude
+            if distFromCenter <= fovPx then
+                if distFromCenter < bestDistance then
+                    bestDistance = distFromCenter
+                    best = t
+                end
+            end
+        end 
+    end 
+    return best
+end
+function CreateFOVCircle()
+    if AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() end
+    if not AimbotSettings.ShowFOV then return end
+    local sg = Player:WaitForChild("PlayerGui"):FindFirstChild("FOVContainer")
+    if not sg then sg = Instance.new("ScreenGui") sg.Name = "FOVContainer" sg.Parent = Player:WaitForChild("PlayerGui") sg.ResetOnSpawn = false sg.IgnoreGuiInset = true end
+    local cam = workspace.CurrentCamera 
+    local fovPx = (AimbotSettings.FOV / 90) * (cam.ViewportSize.Y / 2) * 2.5
+    -- Точный центр экрана
+    local screenCenterX = cam.ViewportSize.X / 2
+    local screenCenterY = cam.ViewportSize.Y / 2
+    local circle = Instance.new("Frame") 
+    circle.Name = "FOVCircle" 
+    circle.AnchorPoint = Vector2.new(0.5, 0.5) -- Якорь в центре
+    circle.Size = UDim2.new(0, fovPx*2, 0, fovPx*2) 
+    circle.Position = UDim2.new(0, screenCenterX, 0, screenCenterY) -- Точный центр
+    circle.BackgroundColor3 = Color3.fromRGB(255,0,0) 
+    circle.BackgroundTransparency = 0.8 
+    circle.BorderSizePixel = 0 
+    circle.ZIndex = 999 
+    circle.Parent = sg
+    local corner = Instance.new("UICorner") corner.CornerRadius = UDim.new(1,0) corner.Parent = circle
+    local stroke = Instance.new("UIStroke") stroke.Color = Color3.fromRGB(255,0,0) stroke.Thickness = 2 stroke.Transparency = 0.5 stroke.Parent = circle
+    AimbotSettings.FOVCircle = circle
+end
+function UpdateAimbot()
+    if not AimbotSettings.Enabled then return end
+    local target = SelectBestTarget()
+    if target then local cam = workspace.CurrentCamera local tp = target.Part.Position local lookAt = CFrame.lookAt(cam.CFrame.Position, tp) cam.CFrame = cam.CFrame:Lerp(lookAt, AimbotSettings.Smooth/100) end
+end
+function EnableAimbot() if AimbotSettings.Enabled then return end AimbotSettings.Enabled = true Settings.Aimbot.Enabled = true SaveAllSettings() CreateFOVCircle() AimbotSettings.Connection = RunService.RenderStepped:Connect(UpdateAimbot) end
+function DisableAimbot() if not AimbotSettings.Enabled then return end AimbotSettings.Enabled = false Settings.Aimbot.Enabled = false SaveAllSettings() if AimbotSettings.Connection then AimbotSettings.Connection:Disconnect() end if AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() AimbotSettings.FOVCircle = nil end end
+
+-- Fly
+function FlySystem:Enable()
+    if self.Enabled then return end self.Enabled = true Settings.MISC.Fly.Enabled = true SaveAllSettings()
+    local char = Player.Character local hum = char and char:FindFirstChild("Humanoid") if hum then hum.PlatformStand = true end
+    self.Connection = RunService.RenderStepped:Connect(function()
+        if not self.Enabled then return end
+        local char = Player.Character local hum = char and char:FindFirstChild("Humanoid") local root = char and char:FindFirstChild("HumanoidRootPart")
+        if hum and root then
+            hum.PlatformStand = true local dir = Vector3.new(0,0,0)
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += workspace.CurrentCamera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= workspace.CurrentCamera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= workspace.CurrentCamera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += workspace.CurrentCamera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.Space) then dir += Vector3.new(0,1,0) end
+            if UserInputService:IsKeyDown(Enum.KeyCode.LeftShift) then dir -= Vector3.new(0,1,0) end
+            if dir.Magnitude > 0 then root.Velocity = dir.Unit * self.Speed else root.Velocity = Vector3.new(0,0,0) end
+        end
+    end)
+end
+function FlySystem:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.Fly.Enabled = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end local char = Player.Character local hum = char and char:FindFirstChild("Humanoid") if hum then hum.PlatformStand = false end end
+function FlySystem:SetSpeed(s) self.Speed = s Settings.MISC.Fly.Speed = s SaveAllSettings() end
+
+-- Noclip
+function Noclip:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.Noclip = true SaveAllSettings() self.Connection = RunService.Stepped:Connect(function() if not self.Enabled then return end local char = Player.Character if char then for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end end) end
+function Noclip:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.Noclip = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end local char = Player.Character if char then for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end end end
+
+-- SpeedHack
+function SpeedHack:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.SpeedHack.Enabled = true SaveAllSettings() local hum = Player.Character and Player.Character:FindFirstChild("Humanoid") if hum then self.OriginalSpeed = hum.WalkSpeed hum.WalkSpeed = self.OriginalSpeed * self.Multiplier end end
+function SpeedHack:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.SpeedHack.Enabled = false SaveAllSettings() local hum = Player.Character and Player.Character:FindFirstChild("Humanoid") if hum and self.OriginalSpeed then hum.WalkSpeed = self.OriginalSpeed end end
+
+-- FullBright
+function FullBright:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.FullBright = true SaveAllSettings() local L = game:GetService("Lighting") self.OriginalBrightness = L.Brightness self.OriginalClockTime = L.ClockTime self.OriginalAmbient = L.Ambient L.Brightness = 3 L.ClockTime = 12 L.Ambient = Color3.fromRGB(255,255,255) L.FogEnd = 100000 L.GlobalShadows = false end
+function FullBright:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.FullBright = false SaveAllSettings() local L = game:GetService("Lighting") L.Brightness = self.OriginalBrightness L.ClockTime = self.OriginalClockTime L.Ambient = self.OriginalAmbient or Color3.fromRGB(0,0,0) L.GlobalShadows = true end
+
+-- AutoFarm
+function AutoFarm:Enable()
+    if self.Enabled then return end self.Enabled = true Settings.AUTO.AutoFarm = true SaveAllSettings() self.CurrentStage = 1 self.IsTeleporting = false self.IsWalking = true self.WalkTimer = 0
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Немного хожу перед запуском цикла...", Duration = 3})
+    task.spawn(function()
+        while self.Enabled and self.IsWalking do
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+            if math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.A, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
+            elseif math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.D, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game) end
+            task.wait(0.1)
+        end
+        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+    end)
+    self.Connection = RunService.Heartbeat:Connect(function(dt)
+        if not self.Enabled or self.IsTeleporting then return end
+        local char = Player.Character local root = char and char:FindFirstChild("HumanoidRootPart") local hum = char and char:FindFirstChild("Humanoid")
+        if not root or not hum then return end
+        if self.IsWalking then
+            self.WalkTimer += dt
+            if self.WalkTimer < 3 then return
+            else self.IsWalking = false self.WalkTimer = 0
+                VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
+                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Запускаю цикл фарма!", Duration = 3})
+            end
+        end
+        if not self.IsWalking then
+            self.IsTeleporting = true workspace.Gravity = 0
+            if self.CurrentStage <= 10 then
+                local tp = self:FindStage(self.CurrentStage)
+                if tp then root.CFrame = tp.CFrame + Vector3.new(0,3,0) task.wait(1.5) self.CurrentStage += 1
+                else task.wait(0.5) self.CurrentStage += 1 end
+            else
+                local chest = self:FindGoldenChest()
+                if chest then
+                    root.CFrame = chest.CFrame + Vector3.new(0,3,0)
+                    local trigger = chest:FindFirstChild("Trigger")
+                    if trigger then if trigger:IsA("BasePart") then root.CFrame = trigger.CFrame + Vector3.new(0,2,0) task.wait(0.5) if trigger:IsA("ProximityPrompt") then fireproximityprompt(trigger) end end end
+                    task.wait(15) self.CurrentStage = 1 self.IsWalking = true self.WalkTimer = 0
+                    task.spawn(function()
+                        while self.Enabled and self.IsWalking do
+                            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game)
+                            if math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.A, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game)
+                            elseif math.random(1, 50) == 1 then VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.D, false, game) task.wait(0.3) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game) end
+                            task.wait(0.1)
+                        end
+                        VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game)
+                    end)
+                else task.wait(5) self.CurrentStage = 1 self.IsWalking = true self.WalkTimer = 0 end
+            end
+            workspace.Gravity = 196.2 self.IsTeleporting = false
+        end
+    end)
+    Player.CharacterAdded:Connect(function() if self.Enabled then workspace.Gravity = 0 self.CurrentStage = 1 self.IsWalking = true self.WalkTimer = 0
+        task.spawn(function() while self.Enabled and self.IsWalking do VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.W, false, game) task.wait(0.1) end VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) end)
+    end end)
+end
+
+function AutoFarm:FindStage(num)
+    local bs = workspace:FindFirstChild("BoatStages") if not bs then return nil end
+    local ns = bs:FindFirstChild("NormalStages") if not ns then return nil end
+    local names = {"CaveStage"..num, "CaveStage"..string.format("%02d",num), "Stage"..num, "Cave"..num, "CaveStage"..string.format("%03d",num)}
+    for _, n in pairs(names) do local stage = ns:FindFirstChild(n) if stage then
+        local dp = stage:FindFirstChild("DarknessPart") if dp then return dp end
+        for _, c in pairs(stage:GetChildren()) do if c:IsA("BasePart") then return c end end
+        for _, c in pairs(stage:GetDescendants()) do if c:IsA("BasePart") then return c end end
+    end end
+    for _, child in pairs(ns:GetChildren()) do if child.Name:lower():find("stage") and child.Name:lower():find(tostring(num)) then
+        for _, c in pairs(child:GetDescendants()) do if c:IsA("BasePart") then return c end end
+    end end
+    return nil
+end
+
+function AutoFarm:FindGoldenChest()
+    local bs = workspace:FindFirstChild("BoatStages") if not bs then return nil end
+    local ns = bs:FindFirstChild("NormalStages") if not ns then return nil end
+    local theEnd = ns:FindFirstChild("TheEnd") if not theEnd then return nil end
+    local goldenChest = theEnd:FindFirstChild("GoldenChest") if not goldenChest then return nil end
+    local trigger = goldenChest:FindFirstChild("Trigger") if trigger then return trigger end
+    return goldenChest
+end
+
+function AutoFarm:Disable() if not self.Enabled then return end self.Enabled = false Settings.AUTO.AutoFarm = false SaveAllSettings() self.IsTeleporting = false self.CurrentStage = 1 self.IsWalking = false self.WalkTimer = 0
+    VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.W, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
+    if self.Connection then self.Connection:Disconnect() end workspace.Gravity = 196.2 end
+
+-- FPS Window
+local function CreateFPSWindow()
+    local SG = Instance.new("ScreenGui") SG.Name = "FPSWindow" SG.Parent = Player:WaitForChild("PlayerGui") SG.ResetOnSpawn = false
+    local Frame = Instance.new("Frame") Frame.Size = UDim2.new(0, 100, 0, 30) Frame.Position = UDim2.new(0.9, 0, 0.05, 0) Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) Frame.BorderSizePixel = 0 Frame.Parent = SG
+    local Label = Instance.new("TextLabel") Label.Size = UDim2.new(1, 0, 1, 0) Label.BackgroundTransparency = 1 Label.Text = "FPS: 0" Label.TextColor3 = Color3.fromRGB(0, 255, 0) Label.Font = Enum.Font.Code Label.TextSize = 16 Label.Parent = Frame
+    local frameCount = 0 local lastTime = os.clock()
+    RunService.RenderStepped:Connect(function() frameCount += 1 local currentTime = os.clock() if currentTime - lastTime >= 1 then Label.Text = "FPS: " .. frameCount frameCount = 0 lastTime = currentTime end end)
+    Frame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then FPSWindow.Dragging = true FPSWindow.DragOffset = Vector2.new(Mouse.X - Frame.AbsolutePosition.X, Mouse.Y - Frame.AbsolutePosition.Y) end end)
+    Frame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then FPSWindow.Dragging = false end end)
+    FPSWindow.Gui = SG FPSWindow.Frame = Frame
+end
+
+-- Menu Button
+local function CreateMenuButton()
+    local SG = Instance.new("ScreenGui") SG.Name = "MenuButtonGui" SG.Parent = Player:WaitForChild("PlayerGui") SG.ResetOnSpawn = false SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    local btn = Instance.new("TextButton") btn.Name = "MenuButton" btn.Size = UDim2.new(0, 50, 0, 50) btn.Position = UDim2.new(0.95, 0, 0.5, 0) btn.BackgroundColor3 = Color3.fromRGB(0, 200, 120) btn.BorderSizePixel = 0 btn.Text = "B" btn.TextColor3 = Color3.fromRGB(255, 255, 255) btn.Font = Enum.Font.Code btn.TextSize = 20 btn.AutoButtonColor = false btn.Parent = SG
+    local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(1, 0) Corner.Parent = btn
+    btn.MouseButton1Click:Connect(function() if Menu.Gui and Menu.MainFrame then Menu.IsOpen = not Menu.IsOpen Menu.MainFrame.Visible = Menu.IsOpen end end)
+    local dragging = false local dragOffset = Vector2.new(0,0)
+    btn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragOffset = Vector2.new(Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y) end end)
+    btn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+    RunService.RenderStepped:Connect(function() if dragging then btn.Position = UDim2.new(0, Mouse.X - dragOffset.X, 0, Mouse.Y - dragOffset.Y) end end)
+    MenuButton.Gui = SG MenuButton.Button = btn
+end
+
+-- GUI
+local function CreateMenu()
+    local SG = Instance.new("ScreenGui") SG.Name = "BoatHelperMenu" SG.Parent = Player:WaitForChild("PlayerGui") SG.ResetOnSpawn = false SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    local MF = Instance.new("Frame") MF.Size = UDim2.new(0,MenuWidth,0,HeaderHeight+TabHeight) MF.Position = UDim2.new(0.5,-MenuWidth/2,0.1,0) MF.BackgroundColor3 = C.BG MF.BorderSizePixel = 0 MF.Parent = SG MF.ZIndex = 2
+    local TopBar = Instance.new("Frame") TopBar.Size = UDim2.new(1,0,0,3) TopBar.BackgroundColor3 = C.On TopBar.BorderSizePixel = 0 TopBar.ZIndex = 5 TopBar.Parent = MF
+    local Header = Instance.new("Frame") Header.Size = UDim2.new(1,0,0,HeaderHeight) Header.BackgroundColor3 = C.Header Header.BorderSizePixel = 0 Header.ZIndex = 3 Header.Parent = MF
+    local Logo = Instance.new("Frame") Logo.Size = UDim2.new(0,30,0,30) Logo.Position = UDim2.new(0,15,0.5,-15) Logo.BackgroundColor3 = C.On Logo.BorderSizePixel = 0 Logo.ZIndex = 4 Logo.Parent = Header
+    local LogoCorner = Instance.new("UICorner") LogoCorner.CornerRadius = UDim.new(1,0) LogoCorner.Parent = Logo
+    local LogoText = Instance.new("TextLabel") LogoText.Size = UDim2.new(1,0,1,0) LogoText.BackgroundTransparency = 1 LogoText.Text = "B" LogoText.TextColor3 = Color3.fromRGB(255,255,255) LogoText.Font = Enum.Font.Code LogoText.TextSize = 18 LogoText.ZIndex = 5 LogoText.Parent = Logo
+    local HeaderText = Instance.new("TextLabel") HeaderText.Size = UDim2.new(1,-180,1,0) HeaderText.Position = UDim2.new(0,55,0,0) HeaderText.BackgroundTransparency = 1 HeaderText.Text = MenuName HeaderText.TextColor3 = C.Bright HeaderText.Font = Enum.Font.Code HeaderText.TextSize = 22 HeaderText.TextXAlignment = Enum.TextXAlignment.Left HeaderText.ZIndex = 4 HeaderText.Parent = Header
+    local KillBtn = Instance.new("TextButton") KillBtn.Size = UDim2.new(0,55,0,30) KillBtn.Position = UDim2.new(1,-110,0.5,-15) KillBtn.BackgroundColor3 = C.Danger KillBtn.BorderSizePixel = 0 KillBtn.Text = "KILL" KillBtn.TextColor3 = C.Bright KillBtn.Font = Enum.Font.Code KillBtn.TextSize = 12 KillBtn.AutoButtonColor = false KillBtn.ZIndex = 4 KillBtn.Parent = Header
+    local CloseBtn = Instance.new("TextButton") CloseBtn.Size = UDim2.new(0,35,0,30) CloseBtn.Position = UDim2.new(1,-45,0.5,-15) CloseBtn.BackgroundColor3 = C.Off CloseBtn.BorderSizePixel = 0 CloseBtn.Text = "X" CloseBtn.TextColor3 = C.Bright CloseBtn.Font = Enum.Font.Code CloseBtn.TextSize = 14 CloseBtn.AutoButtonColor = false CloseBtn.ZIndex = 4 CloseBtn.Parent = Header
+    CloseBtn.MouseButton1Click:Connect(function() Menu:Destroy() end) KillBtn.MouseButton1Click:Connect(function() Menu:Destroy() end)
+    local TabPanel = Instance.new("Frame") TabPanel.Size = UDim2.new(1,0,0,TabHeight) TabPanel.Position = UDim2.new(0,0,0,HeaderHeight) TabPanel.BackgroundColor3 = C.Tab TabPanel.BorderSizePixel = 0 TabPanel.ZIndex = 3 TabPanel.Parent = MF
+    local Tabs = {"ESP","AIMBOT","MISC","AUTO","PLAYER","SCRIPT","PHON"}
+    for i, tabName in ipairs(Tabs) do
+        local TabBtn = Instance.new("TextButton") TabBtn.Size = UDim2.new(1/7,-4,0,TabHeight-8) TabBtn.Position = UDim2.new((i-1)/7,2,0,4) TabBtn.BackgroundColor3 = i==1 and C.TabActive or C.Tab TabBtn.BorderSizePixel = 0 TabBtn.Text = tabName TabBtn.TextColor3 = i==1 and C.Bright or C.Text TabBtn.Font = Enum.Font.Code TabBtn.TextSize = 11 TabBtn.AutoButtonColor = false TabBtn.ZIndex = 4 TabBtn.Parent = TabPanel
+        local TabCorner = Instance.new("UICorner") TabCorner.CornerRadius = UDim.new(0,5) TabCorner.Parent = TabBtn
+        TabBtn.MouseButton1Click:Connect(function() Menu:SwitchTab(tabName) end)
+        Menu.TabButtons[tabName] = TabBtn
+    end
+    local ScrollFrame = Instance.new("ScrollingFrame") ScrollFrame.Size = UDim2.new(1,0,1,-HeaderHeight-TabHeight) ScrollFrame.Position = UDim2.new(0,0,0,HeaderHeight+TabHeight) ScrollFrame.BackgroundTransparency = 1 ScrollFrame.BorderSizePixel = 0 ScrollFrame.ZIndex = 3 ScrollFrame.Parent = MF ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y ScrollFrame.ScrollBarThickness = 6 ScrollFrame.ScrollBarImageColor3 = C.ScrollBar ScrollFrame.CanvasSize = UDim2.new(0,0,0,0) ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y ScrollFrame.ScrollBarImageTransparency = 0.3
+    Menu.ScrollFrame = ScrollFrame Menu.ItemsContainer = ScrollFrame
+    Header.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Menu.Dragging = true Menu.DragOffset = Vector2.new(Mouse.X-MF.AbsolutePosition.X, Mouse.Y-MF.AbsolutePosition.Y) end end)
+    Header.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Menu.Dragging = false end end)
+    Menu.Gui = SG Menu.MainFrame = MF
+end
+
+function Menu:SaveCurrentStates()
+    TabStates.ESP.ESPEnabled = ESP.Enabled
+    TabStates.ESP.ShowNames = ESP.ShowNames
+    TabStates.ESP.ShowDistance = ESP.ShowDistance
+    TabStates.ESP.ShowHealth = ESP.ShowHealth
+    TabStates.ESP.TracersEnabled = Tracers.Enabled
+    TabStates.AIMBOT.AimbotEnabled = AimbotSettings.Enabled
+    TabStates.MISC.FlyEnabled = FlySystem.Enabled
+    TabStates.MISC.FlySpeed = FlySystem.Speed
+    TabStates.MISC.SpeedHackMultiplier = SpeedHack.Multiplier
+    TabStates.AUTO.AutoFarmEnabled = AutoFarm.Enabled
+    SaveAllSettings()
+end
+
+function Menu:SwitchTab(tabName)
+    self:SaveCurrentStates()
+    self.CurrentTab = tabName
+    for _, c in pairs(self.SliderConnections) do c:Disconnect() end self.SliderConnections = {}
+    for name, btn in pairs(self.TabButtons) do if name == tabName then btn.BackgroundColor3 = C.TabActive btn.TextColor3 = C.Bright else btn.BackgroundColor3 = C.Tab btn.TextColor3 = C.Text end end
+    if self.ItemsContainer then for _, c in pairs(self.ItemsContainer:GetChildren()) do c:Destroy() end end
+    self.Items = {} self.AllItems = {}
+    if tabName == "ESP" then self:AddESPItems() elseif tabName == "AIMBOT" then self:AddAimbotItems() elseif tabName == "MISC" then self:AddMiscItems() elseif tabName == "AUTO" then self:AddAutoItems() elseif tabName == "PLAYER" then self:AddPlayerItems() elseif tabName == "SCRIPT" then self:AddScriptItems() elseif tabName == "PHON" then self:AddPhonItems() end
+    self:UpdateSize()
+end
+
+function Menu:UpdateSize()
+    local h = HeaderHeight + TabHeight + 10
+    for _, item in pairs(self.Items) do h += item.Height + Spacing end
+    if h > MaxVisibleHeight then h = MaxVisibleHeight end
+    self.MainFrame.Size = UDim2.new(0,MenuWidth,0,h) self.ItemsContainer.Size = UDim2.new(1,0,0,h-HeaderHeight-TabHeight)
+end
+
+function Menu:RecalculatePositions()
+    local y = 5
+    for _, item in pairs(self.Items) do item.Frame.Position = UDim2.new(0,0,0,y) y += item.Height + Spacing end
+    self:UpdateSize()
+end
+
+function Menu:StartBinding(item, cb) self.WaitingForBind = {item=item, callback=cb} item.BindButton.Text = "..." end
+
+function Menu:AddToggleWithExpand(name, desc, default, callback, expandContent, savedExpanded, expandHeight)
+    local count = #self.Items local y = 5 + count*(ItemHeight+Spacing)
+    local MainContainer = Instance.new("Frame") MainContainer.Size = UDim2.new(1,0,0,ItemHeight) MainContainer.Position = UDim2.new(0,0,0,y) MainContainer.BackgroundTransparency = 1 MainContainer.BorderSizePixel = 0 MainContainer.ZIndex = 3 MainContainer.Parent = self.ItemsContainer
+    local Frame = Instance.new("Frame") Frame.Size = UDim2.new(1,-20,0,ItemHeight) Frame.Position = UDim2.new(0,10,0,0) Frame.BackgroundColor3 = C.Item Frame.BorderSizePixel = 0 Frame.ZIndex = 3 Frame.Parent = MainContainer
+    local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0,5) Corner.Parent = Frame
+    local Name = Instance.new("TextLabel") Name.Size = UDim2.new(0.45,0,0,24) Name.Position = UDim2.new(0,15,0,6) Name.BackgroundTransparency = 1 Name.Text = name Name.TextColor3 = C.Bright Name.Font = Enum.Font.Code Name.TextSize = 16 Name.TextXAlignment = Enum.TextXAlignment.Left Name.ZIndex = 4 Name.Parent = Frame
+    local Desc = Instance.new("TextLabel") Desc.Size = UDim2.new(0.45,0,0,18) Desc.Position = UDim2.new(0,15,0,34) Desc.BackgroundTransparency = 1 Desc.Text = desc or "" Desc.TextColor3 = C.Text Desc.Font = Enum.Font.Code Desc.TextSize = 11 Desc.TextXAlignment = Enum.TextXAlignment.Left Desc.ZIndex = 4 Desc.Parent = Frame
+    local ArrowBtn = Instance.new("TextButton") ArrowBtn.Size = UDim2.new(0,25,0,25) ArrowBtn.Position = UDim2.new(0.55,0,0.5,-12) ArrowBtn.BackgroundColor3 = C.ArrowBG ArrowBtn.BorderSizePixel = 0 ArrowBtn.Text = savedExpanded and "v" or ">" ArrowBtn.TextColor3 = C.Bright ArrowBtn.Font = Enum.Font.Code ArrowBtn.TextSize = 14 ArrowBtn.AutoButtonColor = false ArrowBtn.ZIndex = 4 ArrowBtn.Parent = Frame
+    local BindButton = Instance.new("TextButton") BindButton.Size = UDim2.new(0,40,0,25) BindButton.Position = UDim2.new(0.6,0,0.5,-12) BindButton.BackgroundColor3 = C.BindBG BindButton.BorderSizePixel = 0 BindButton.Text = "BIND" BindButton.TextColor3 = C.Bright BindButton.Font = Enum.Font.Code BindButton.TextSize = 10 BindButton.AutoButtonColor = false BindButton.ZIndex = 4 BindButton.Parent = Frame
+    local Toggle = Instance.new("TextButton") Toggle.Size = UDim2.new(0,50,0,28) Toggle.Position = UDim2.new(0.85,0,0.5,-14) Toggle.BackgroundColor3 = default and C.On or C.Off Toggle.BorderSizePixel = 0 Toggle.Text = "" Toggle.AutoButtonColor = false Toggle.ZIndex = 4 Toggle.Parent = Frame
+    local ToggleCorner = Instance.new("UICorner") ToggleCorner.CornerRadius = UDim.new(0,14) ToggleCorner.Parent = Toggle
+    local Knob = Instance.new("Frame") Knob.Size = UDim2.new(0,22,0,22) Knob.Position = UDim2.new(0,default and 35 or 3,0.5,-11) Knob.BackgroundColor3 = C.Bright Knob.BorderSizePixel = 0 Knob.ZIndex = 5 Knob.Parent = Toggle
+    local KnobCorner = Instance.new("UICorner") KnobCorner.CornerRadius = UDim.new(1,0) KnobCorner.Parent = Knob
+    local State = Instance.new("TextLabel") State.Size = UDim2.new(0,35,0,22) State.Position = UDim2.new(0.85,-45,0.5,-11) State.BackgroundTransparency = 1 State.Text = default and "ON" or "OFF" State.TextColor3 = default and C.On or C.Text State.Font = Enum.Font.Code State.TextSize = 11 State.TextXAlignment = Enum.TextXAlignment.Right State.ZIndex = 4 State.Parent = Frame
+    local ExpandFrame = Instance.new("Frame") ExpandFrame.Size = UDim2.new(1,-30,0,0) ExpandFrame.Position = UDim2.new(0,15,0,ItemHeight) ExpandFrame.BackgroundColor3 = C.Item ExpandFrame.BorderSizePixel = 0 ExpandFrame.ZIndex = 3 ExpandFrame.Visible = savedExpanded or false ExpandFrame.Parent = MainContainer
+    local isExpanded = savedExpanded or false local state = default or false local expHeight = expandHeight or 70
+    local item = {Frame = MainContainer, BindButton = BindButton, BindKey = nil, Height = isExpanded and (ItemHeight + expHeight) or ItemHeight,
+        ToggleFunction = function() state = not state Toggle.BackgroundColor3 = state and C.On or C.Off Knob.Position = UDim2.new(0,state and 35 or 3,0.5,-11) State.Text = state and "ON" or "OFF" State.TextColor3 = state and C.On or C.Text if callback then callback(state) end end,
+        SetState = function(s) state = s Toggle.BackgroundColor3 = state and C.On or C.Off Knob.Position = UDim2.new(0,state and 35 or 3,0.5,-11) State.Text = state and "ON" or "OFF" State.TextColor3 = state and C.On or C.Text if callback then callback(state) end end,
+        GetState = function() return state end}
+    local function UpdateHeight()
+        if isExpanded then item.Height = ItemHeight + expHeight MainContainer.Size = UDim2.new(1,0,0,item.Height) else item.Height = ItemHeight MainContainer.Size = UDim2.new(1,0,0,item.Height) end
+        Menu:RecalculatePositions()
+    end
+    ArrowBtn.MouseButton1Click:Connect(function() isExpanded = not isExpanded ExpandFrame.Visible = isExpanded ArrowBtn.Text = isExpanded and "v" or ">" if isExpanded and expandContent then expandContent(ExpandFrame) end UpdateHeight() end)
+    BindButton.MouseButton1Click:Connect(function() Menu:StartBinding(item, function(key) item.BindKey = key BindButton.Text = key.Name end) end)
+    Toggle.MouseButton1Click:Connect(function() if Menu.FunctionsEnabled then item.ToggleFunction() end end)
+    if isExpanded and expandContent then expandContent(ExpandFrame) MainContainer.Size = UDim2.new(1,0,0,item.Height) end
+    table.insert(self.Items, item) table.insert(self.AllItems, item) self:UpdateSize() return item
+end
+
+function CreateSliderInExpand(parent, name, min, max, default, yPos, callback)
+    local SliderName = Instance.new("TextLabel") SliderName.Size = UDim2.new(1,-30,0,20) SliderName.Position = UDim2.new(0,15,0,yPos) SliderName.BackgroundTransparency = 1 SliderName.Text = name..": "..default SliderName.TextColor3 = C.Bright SliderName.Font = Enum.Font.Code SliderName.TextSize = 12 SliderName.TextXAlignment = Enum.TextXAlignment.Left SliderName.ZIndex = 4 SliderName.Parent = parent
+    local SliderButton = Instance.new("TextButton") SliderButton.Size = UDim2.new(1,-30,0,18) SliderButton.Position = UDim2.new(0,15,0,yPos+18) SliderButton.BackgroundTransparency = 1 SliderButton.BorderSizePixel = 0 SliderButton.Text = "" SliderButton.AutoButtonColor = false SliderButton.ZIndex = 6 SliderButton.Parent = parent
+    local SliderFrame = Instance.new("Frame") SliderFrame.Size = UDim2.new(1,0,0,6) SliderFrame.Position = UDim2.new(0,0,0.5,-3) SliderFrame.BackgroundColor3 = C.Off SliderFrame.BorderSizePixel = 0 SliderFrame.ZIndex = 4 SliderFrame.Parent = SliderButton
+    local Fill = Instance.new("Frame") local percent = (default-min)/(max-min) Fill.Size = UDim2.new(percent,0,1,0) Fill.BackgroundColor3 = C.SliderFill Fill.BorderSizePixel = 0 Fill.ZIndex = 5 Fill.Parent = SliderFrame
+    local Knob = Instance.new("Frame") Knob.Size = UDim2.new(0,14,0,14) Knob.Position = UDim2.new(percent,-7,0.5,-7) Knob.BackgroundColor3 = C.Bright Knob.BorderSizePixel = 0 Knob.ZIndex = 6 Knob.Parent = SliderFrame
+    local dragging = false
+    local function UpdateValue(inputX)
+        local absX = SliderButton.AbsolutePosition.X local width = SliderButton.AbsoluteSize.X local p = math.clamp((inputX-absX)/width,0,1)
+        local val = math.floor(min+(max-min)*p+0.5)
+        Fill.Size = UDim2.new(p,0,1,0) Knob.Position = UDim2.new(p,-7,0.5,-7) SliderName.Text = name..": "..val
+        if callback then callback(val) end
+    end
+    SliderButton.MouseButton1Down:Connect(function() dragging = true UpdateValue(Mouse.X) end)
+    local ic = UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+    local rc = RunService.RenderStepped:Connect(function() if dragging and Menu.FunctionsEnabled then UpdateValue(Mouse.X) end end)
+    table.insert(Menu.SliderConnections, ic) table.insert(Menu.SliderConnections, rc)
+end
+
+function CreateToggleInExpand(parent, name, default, yPos, callback)
+    local TF = Instance.new("Frame") TF.Size = UDim2.new(1,-20,0,35) TF.Position = UDim2.new(0,10,0,yPos) TF.BackgroundColor3 = C.Item TF.BorderSizePixel = 0 TF.ZIndex = 4 TF.Parent = parent
+    local Label = Instance.new("TextLabel") Label.Size = UDim2.new(0.7,0,1,0) Label.Position = UDim2.new(0,10,0,0) Label.BackgroundTransparency = 1 Label.Text = name Label.TextColor3 = C.Bright Label.Font = Enum.Font.Code Label.TextSize = 11 Label.TextXAlignment = Enum.TextXAlignment.Left Label.ZIndex = 5 Label.Parent = TF
+    local Btn = Instance.new("TextButton") Btn.Size = UDim2.new(0,40,0,20) Btn.Position = UDim2.new(0.8,0,0.5,-10) Btn.BackgroundColor3 = default and C.On or C.Off Btn.BorderSizePixel = 0 Btn.Text = "" Btn.AutoButtonColor = false Btn.ZIndex = 5 Btn.Parent = TF
+    local Knob = Instance.new("Frame") Knob.Size = UDim2.new(0,14,0,14) Knob.Position = UDim2.new(0,default and 23 or 3,0.5,-7) Knob.BackgroundColor3 = C.Bright Knob.BorderSizePixel = 0 Knob.ZIndex = 6 Knob.Parent = Btn
+    local state = default
+    Btn.MouseButton1Click:Connect(function() state = not state Btn.BackgroundColor3 = state and C.On or C.Off Knob.Position = UDim2.new(0,state and 23 or 3,0.5,-7) if callback then callback(state) end end)
+end
+
+-- Tab Content
+function Menu:AddESPItems()
+    self:AddToggleWithExpand("ESP Игроков", "Подсветка всех игроков", ESP.Enabled, function(state)
+        if state then ESP:Enable() else ESP:Disable() end
+    end, function(ef)
+        ef.Size = UDim2.new(1,-30,0,160)
+        CreateToggleInExpand(ef, "Показывать имена", ESP.ShowNames, 5, function(s) ESP:SetShowNames(s) end)
+        CreateToggleInExpand(ef, "Показывать расстояние", ESP.ShowDistance, 45, function(s) ESP:SetShowDistance(s) end)
+        CreateToggleInExpand(ef, "Показывать здоровье", ESP.ShowHealth, 85, function(s) ESP:SetShowHealth(s) end)
+    end, TabStates.ESP.ESPExpanded, 160)
+    self:AddToggleWithExpand("Трасеры", "Линии к игрокам", Tracers.Enabled, function(state)
+        if state then Tracers:Enable() else Tracers:Disable() end
+    end)
+end
+
+function Menu:AddAimbotItems()
+    self:AddToggleWithExpand("Aim Bot", "Мастер переключатель", AimbotSettings.Enabled, function(state)
+        if state then EnableAimbot() else DisableAimbot() end
+    end, function(ef)
+        ef.Size = UDim2.new(1,-30,0,400)
+        local BoneFrame = Instance.new("Frame") BoneFrame.Size = UDim2.new(1,-20,0,40) BoneFrame.Position = UDim2.new(0,10,0,5) BoneFrame.BackgroundColor3 = C.Item BoneFrame.BorderSizePixel = 0 BoneFrame.ZIndex = 4 BoneFrame.Parent = ef
+        local BoneLabel = Instance.new("TextLabel") BoneLabel.Size = UDim2.new(0.5,0,1,0) BoneLabel.Position = UDim2.new(0,10,0,0) BoneLabel.BackgroundTransparency = 1 BoneLabel.Text = "Часть тела" BoneLabel.TextColor3 = C.Bright BoneLabel.Font = Enum.Font.Code BoneLabel.TextSize = 12 BoneLabel.TextXAlignment = Enum.TextXAlignment.Left BoneLabel.ZIndex = 5 BoneLabel.Parent = BoneFrame
+        local BoneBtn = Instance.new("TextButton") BoneBtn.Size = UDim2.new(0,100,0,25) BoneBtn.Position = UDim2.new(0.6,0,0.5,-12) BoneBtn.BackgroundColor3 = C.Accent BoneBtn.BorderSizePixel = 0 BoneBtn.Text = AimbotSettings.TargetBone BoneBtn.TextColor3 = C.Bright BoneBtn.Font = Enum.Font.Code BoneBtn.TextSize = 10 BoneBtn.AutoButtonColor = false BoneBtn.ZIndex = 5 BoneBtn.Parent = BoneFrame
+        local bones = {"Head","Neck","Chest","Closest"} local bi = 1 for i,b in pairs(bones) do if b == AimbotSettings.TargetBone then bi = i end end
+        BoneBtn.MouseButton1Click:Connect(function() bi = bi + 1 if bi > #bones then bi = 1 end AimbotSettings.TargetBone = bones[bi] Settings.Aimbot.TargetBone = bones[bi] SaveAllSettings() BoneBtn.Text = bones[bi] end)
+        local PF = Instance.new("Frame") PF.Size = UDim2.new(1,-20,0,40) PF.Position = UDim2.new(0,10,0,50) PF.BackgroundColor3 = C.Item PF.BorderSizePixel = 0 PF.ZIndex = 4 PF.Parent = ef
+        local PL = Instance.new("TextLabel") PL.Size = UDim2.new(0.5,0,1,0) PL.Position = UDim2.new(0,10,0,0) PL.BackgroundTransparency = 1 PL.Text = "Приоритет" PL.TextColor3 = C.Bright PL.Font = Enum.Font.Code PL.TextSize = 12 PL.TextXAlignment = Enum.TextXAlignment.Left PL.ZIndex = 5 PL.Parent = PF
+        local PB = Instance.new("TextButton") PB.Size = UDim2.new(0,100,0,25) PB.Position = UDim2.new(0.6,0,0.5,-12) PB.BackgroundColor3 = C.Accent PB.BorderSizePixel = 0 PB.Text = AimbotSettings.TargetPriority PB.TextColor3 = C.Bright PB.Font = Enum.Font.Code PB.TextSize = 10 PB.AutoButtonColor = false PB.ZIndex = 5 PB.Parent = PF
+        PB.MouseButton1Click:Connect(function() if AimbotSettings.TargetPriority == "Distance" then AimbotSettings.TargetPriority = "Health" else AimbotSettings.TargetPriority = "Distance" end Settings.Aimbot.TargetPriority = AimbotSettings.TargetPriority SaveAllSettings() PB.Text = AimbotSettings.TargetPriority end)
+        CreateSliderInExpand(ef, "FOV (градусы)", 0, 360, AimbotSettings.FOV, 95, function(v) AimbotSettings.FOV = v Settings.Aimbot.FOV = v SaveAllSettings() if AimbotSettings.ShowFOV then CreateFOVCircle() end end)
+        CreateSliderInExpand(ef, "Плавность", 1, 100, AimbotSettings.Smooth, 140, function(v) AimbotSettings.Smooth = v Settings.Aimbot.Smooth = v SaveAllSettings() end)
+        CreateSliderInExpand(ef, "Сила RCS", 0, 100, AimbotSettings.RCSStrength*100, 185, function(v) AimbotSettings.RCSStrength = v/100 Settings.Aimbot.RCSStrength = v/100 SaveAllSettings() end)
+        CreateToggleInExpand(ef, "Показывать FOV круг", AimbotSettings.ShowFOV, 230, function(s) AimbotSettings.ShowFOV = s Settings.Aimbot.ShowFOV = s SaveAllSettings() if s then CreateFOVCircle() elseif AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() AimbotSettings.FOVCircle = nil end end)
+        CreateToggleInExpand(ef, "Включить RCS", AimbotSettings.RCSEnabled, 270, function(s) AimbotSettings.RCSEnabled = s Settings.Aimbot.RCSEnabled = s SaveAllSettings() end)
+        CreateToggleInExpand(ef, "Проверка видимости", AimbotSettings.VisibleCheck, 310, function(s) AimbotSettings.VisibleCheck = s Settings.Aimbot.VisibleCheck = s SaveAllSettings() end)
+        CreateToggleInExpand(ef, "Team Check", AimbotSettings.TeamCheck, 350, function(s) AimbotSettings.TeamCheck = s Settings.Aimbot.TeamCheck = s SaveAllSettings() end)
+    end, TabStates.AIMBOT.AimbotExpanded, 410)
+end
+
+function Menu:AddMiscItems()
+    self:AddToggleWithExpand("Полёт", "WASD + Space/Shift", FlySystem.Enabled, function(state)
+        if state then FlySystem:Enable() else FlySystem:Disable() end
+    end, function(ef)
+        ef.Size = UDim2.new(1,-30,0,70)
+        CreateSliderInExpand(ef, "Скорость полёта", 10, 200, FlySystem.Speed, 5, function(v) FlySystem:SetSpeed(v) end)
+    end, TabStates.MISC.FlyExpanded, 70)
+    self:AddToggleWithExpand("Noclip", "Прохождение сквозь стены", Noclip.Enabled, function(state) if state then Noclip:Enable() else Noclip:Disable() end end)
+    self:AddToggleWithExpand("Speed Hack", "Ускорение x"..SpeedHack.Multiplier, SpeedHack.Enabled, function(state) if state then SpeedHack:Enable() else SpeedHack:Disable() end end, function(ef)
+        ef.Size = UDim2.new(1,-30,0,70)
+        CreateSliderInExpand(ef, "Множитель", 1, 10, SpeedHack.Multiplier, 5, function(v) SpeedHack.Multiplier = v Settings.MISC.SpeedHack.Multiplier = v SaveAllSettings() if SpeedHack.Enabled then local h = Player.Character and Player.Character:FindFirstChild("Humanoid") if h then h.WalkSpeed = SpeedHack.OriginalSpeed * v end end end)
+    end, TabStates.MISC.SpeedHackExpanded, 70)
+    self:AddToggleWithExpand("Full Bright", "Полная яркость", FullBright.Enabled, function(state) if state then FullBright:Enable() else FullBright:Disable() end end)
+end
+
+function Menu:AddAutoItems()
+    self:AddToggleWithExpand("Авто фарм", "Ходьба + пещеры + сундук", AutoFarm.Enabled, function(state)
+        if state then AutoFarm:Enable() else AutoFarm:Disable() end
+    end)
+end
+
+function Menu:AddPlayerItems()
+    local EmptyLabel = Instance.new("TextLabel") EmptyLabel.Size = UDim2.new(1,-20,0,40) EmptyLabel.Position = UDim2.new(0,10,0,10) EmptyLabel.BackgroundTransparency = 1 EmptyLabel.Text = "PLAYER - пусто" EmptyLabel.TextColor3 = C.Text EmptyLabel.Font = Enum.Font.Code EmptyLabel.TextSize = 16 EmptyLabel.ZIndex = 4 EmptyLabel.Parent = self.ItemsContainer
+end
+
+function Menu:AddScriptItems()
+    local Frame = Instance.new("Frame") Frame.Size = UDim2.new(1,-20,0,ItemHeight) Frame.Position = UDim2.new(0,10,0,5) Frame.BackgroundColor3 = C.Item Frame.BorderSizePixel = 0 Frame.ZIndex = 3 Frame.Parent = self.ItemsContainer
+    local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0,5) Corner.Parent = Frame
+    local Name = Instance.new("TextLabel") Name.Size = UDim2.new(0.6,0,0,24) Name.Position = UDim2.new(0,15,0,6) Name.BackgroundTransparency = 1 Name.Text = "Infinite Yield" Name.TextColor3 = C.Bright Name.Font = Enum.Font.Code Name.TextSize = 16 Name.TextXAlignment = Enum.TextXAlignment.Left Name.ZIndex = 4 Name.Parent = Frame
+    local Desc = Instance.new("TextLabel") Desc.Size = UDim2.new(0.6,0,0,18) Desc.Position = UDim2.new(0,15,0,34) Desc.BackgroundTransparency = 1 Desc.Text = "Нажмите для запуска скрипта" Desc.TextColor3 = C.Text Desc.Font = Enum.Font.Code Desc.TextSize = 11 Desc.TextXAlignment = Enum.TextXAlignment.Left Desc.ZIndex = 4 Desc.Parent = Frame
+    local LaunchBtn = Instance.new("TextButton") LaunchBtn.Size = UDim2.new(0,100,0,35) LaunchBtn.Position = UDim2.new(0.75,0,0.5,-17) LaunchBtn.BackgroundColor3 = C.On LaunchBtn.BorderSizePixel = 0 LaunchBtn.Text = "ЗАПУСК" LaunchBtn.TextColor3 = C.Bright LaunchBtn.Font = Enum.Font.Code LaunchBtn.TextSize = 14 LaunchBtn.AutoButtonColor = false LaunchBtn.ZIndex = 4 LaunchBtn.Parent = Frame
+    local BtnCorner = Instance.new("UICorner") BtnCorner.CornerRadius = UDim.new(0,6) BtnCorner.Parent = LaunchBtn
+    LaunchBtn.MouseButton1Click:Connect(function()
+        LaunchBtn.Text = "ЗАГРУЗКА..." LaunchBtn.BackgroundColor3 = C.Accent
+        task.spawn(function()
+            local success, err = pcall(function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end)
+            if success then
+                LaunchBtn.Text = "ГОТОВО!" LaunchBtn.BackgroundColor3 = C.On
+                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Infinite Yield успешно запущен!", Duration = 3})
+                task.wait(2) LaunchBtn.Text = "ЗАПУСК"
+            else
+                LaunchBtn.Text = "ОШИБКА!" LaunchBtn.BackgroundColor3 = C.Danger
+                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Не удалось запустить Infinite Yield!", Duration = 5})
+                task.wait(2) LaunchBtn.Text = "ЗАПУСК" LaunchBtn.BackgroundColor3 = C.On
+            end
+        end)
+    end)
+    local item = {Frame = Frame, Height = ItemHeight, ToggleFunction = function() end, SetState = function() end, GetState = function() return false end}
+    table.insert(self.Items, item) table.insert(self.AllItems, item) self:UpdateSize()
+end
+
+function Menu:AddPhonItems()
+    self:AddToggleWithExpand("Бинды для функций", "Включить/выключить кнопки", false, nil, function(ef)
+        ef.Size = UDim2.new(1,-30,0,250)
+        local function CreateDraggableButton(guiName, btnName, text, yPos, getState, toggleFunc)
+            local SG = Instance.new("ScreenGui") SG.Name = guiName SG.Parent = Player:WaitForChild("PlayerGui") SG.ResetOnSpawn = false SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+            local btn = Instance.new("TextButton") btn.Name = btnName btn.Size = UDim2.new(0,70,0,40) btn.Position = UDim2.new(0.85,0,yPos,0) btn.BackgroundColor3 = getState() and Color3.fromRGB(0,200,120) or Color3.fromRGB(50,50,65) btn.BorderSizePixel = 0 btn.Text = text btn.TextColor3 = Color3.fromRGB(240,240,255) btn.Font = Enum.Font.Code btn.TextSize = 12 btn.AutoButtonColor = false btn.Parent = SG
+            local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0,8) Corner.Parent = btn
+            btn.MouseButton1Click:Connect(function() toggleFunc() btn.BackgroundColor3 = getState() and Color3.fromRGB(0,200,120) or Color3.fromRGB(50,50,65) end)
+            local dragging = false local dragOffset = Vector2.new(0,0)
+            btn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragOffset = Vector2.new(Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y) end end)
+            btn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
+            RunService.RenderStepped:Connect(function() if dragging and btn.Parent then btn.Position = UDim2.new(0, Mouse.X - dragOffset.X, 0, Mouse.Y - dragOffset.Y) end end)
+            return SG
+        end
+        CreateToggleInExpand(ef, "Кнопка для ESP", TabStates.PHON.ESPKey, 5, function(s) TabStates.PHON.ESPKey = s Settings.PHON.ESPKey = s SaveAllSettings() if s then CreateDraggableButton("ESPKeyGui","ESPKeyBtn","ESP",0.15,function() return ESP.Enabled end,function() if ESP.Enabled then ESP:Disable() else ESP:Enable() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("ESPKeyGui") if SG then SG:Destroy() end end end)
+        CreateToggleInExpand(ef, "Кнопка для Aimbot", TabStates.PHON.AimbotKey, 45, function(s) TabStates.PHON.AimbotKey = s Settings.PHON.AimbotKey = s SaveAllSettings() if s then CreateDraggableButton("AimbotKeyGui","AimbotKeyBtn","AIMBOT",0.25,function() return AimbotSettings.Enabled end,function() if AimbotSettings.Enabled then DisableAimbot() else EnableAimbot() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("AimbotKeyGui") if SG then SG:Destroy() end end end)
+        CreateToggleInExpand(ef, "Кнопка для Fly", TabStates.PHON.FlyKey, 85, function(s) TabStates.PHON.FlyKey = s Settings.PHON.FlyKey = s SaveAllSettings() if s then CreateDraggableButton("FlyKeyGui","FlyKeyBtn","FLY",0.35,function() return FlySystem.Enabled end,function() if FlySystem.Enabled then FlySystem:Disable() else FlySystem:Enable() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("FlyKeyGui") if SG then SG:Destroy() end end end)
+        CreateToggleInExpand(ef, "Кнопка для Noclip", TabStates.PHON.NoclipKey, 125, function(s) TabStates.PHON.NoclipKey = s Settings.PHON.NoclipKey = s SaveAllSettings() if s then CreateDraggableButton("NoclipKeyGui","NoclipKeyBtn","NOCLIP",0.45,function() return Noclip.Enabled end,function() if Noclip.Enabled then Noclip:Disable() else Noclip:Enable() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("NoclipKeyGui") if SG then SG:Destroy() end end end)
+        CreateToggleInExpand(ef, "Кнопка для Speed", TabStates.PHON.SpeedKey, 165, function(s) TabStates.PHON.SpeedKey = s Settings.PHON.SpeedKey = s SaveAllSettings() if s then CreateDraggableButton("SpeedKeyGui","SpeedKeyBtn","SPEED",0.55,function() return SpeedHack.Enabled end,function() if SpeedHack.Enabled then SpeedHack:Disable() else SpeedHack:Enable() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("SpeedKeyGui") if SG then SG:Destroy() end end end)
+        CreateToggleInExpand(ef, "Кнопка для AutoFarm", TabStates.PHON.AutoFarmKey, 205, function(s) TabStates.PHON.AutoFarmKey = s Settings.PHON.AutoFarmKey = s SaveAllSettings() if s then CreateDraggableButton("AutoFarmKeyGui","AutoFarmKeyBtn","FARM",0.65,function() return AutoFarm.Enabled end,function() if AutoFarm.Enabled then AutoFarm:Disable() else AutoFarm:Enable() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("AutoFarmKeyGui") if SG then SG:Destroy() end end end)
+    end, false, 250)
+end
+
+function Menu:Destroy()
+    Menu.FunctionsEnabled = false Menu.IsOpen = false Menu.Dragging = false
+    for _, c in pairs(self.SliderConnections) do c:Disconnect() end
+    SaveAllSettings()
+    if Menu.Gui then Menu.Gui:Destroy() end
+end
+
+-- Инициализация
+if ESP.Enabled then ESP:Enable() end
+if Tracers.Enabled then Tracers:Enable() end
+if AimbotSettings.Enabled then EnableAimbot() end
+if FlySystem.Enabled then FlySystem:Enable() end
+if Noclip.Enabled then Noclip:Enable() end
+if SpeedHack.Enabled then SpeedHack:Enable() end
+if FullBright.Enabled then FullBright:Enable() end
+if AutoFarm.Enabled then AutoFarm:Enable() end
+
+CreateMenu()
+Menu:SwitchTab("ESP")
+CreateFPSWindow()
+CreateMenuButton()
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if input.KeyCode == Enum.KeyCode.Insert and Menu.Gui and Menu.MainFrame then
+        Menu.IsOpen = not Menu.IsOpen 
+        Menu.MainFrame.Visible = Menu.IsOpen
+        if Menu.IsOpen then
+            Menu:SaveCurrentStates()
+            Menu:SwitchTab(Menu.CurrentTab)
+        end
+    end
+end)
+
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if gpe then return end
+    if Menu.WaitingForBind then
+        local bind = Menu.WaitingForBind Menu.WaitingForBind = nil
+        bind.callback(input.KeyCode) return
+    end
+    for _, item in pairs(Menu.AllItems) do
+        if item.BindKey and input.KeyCode == item.BindKey then item.ToggleFunction() end
+    end
+end)
+
+RunService.RenderStepped:Connect(function()
+    if Menu.Dragging and Menu.MainFrame and Menu.FunctionsEnabled then
+        local x = math.clamp(Mouse.X - Menu.DragOffset.X, 0, workspace.CurrentCamera.ViewportSize.X - Menu.MainFrame.AbsoluteSize.X)
+        local y = math.clamp(Mouse.Y - Menu.DragOffset.Y, 0, workspace.CurrentCamera.ViewportSize.Y - Menu.MainFrame.AbsoluteSize.Y)
+        Menu.MainFrame.Position = UDim2.new(0,x,0,y)
+    end
+    if FPSWindow.Dragging and FPSWindow.Frame then
+        FPSWindow.Frame.Position = UDim2.new(0, Mouse.X - FPSWindow.DragOffset.X, 0, Mouse.Y - FPSWindow.DragOffset.Y)
+    end
+end)
+
+print("[BoatHelper] Загружено! Нажмите Insert или кнопку B")
