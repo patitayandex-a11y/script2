@@ -1,4 +1,4 @@
--- // ПОЛНЫЙ КОД С ПЕРЕТАСКИВАЕМЫМИ PHON КНОПКАМИ
+-- // ПОЛНЫЙ КОД С ПЕРЕТАСКИВАЕМЫМИ PHON КНОПКАМИ И ВКЛАДКОЙ SETTINGS
 -- // BoatHelper - Premium Dark-Gray Menu with Beautiful UI and All Functions + FPS Window + Binds + PHON + Menu Button
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
@@ -233,14 +233,13 @@ function CreateFOVCircle()
     if not sg then sg = Instance.new("ScreenGui") sg.Name = "FOVContainer" sg.Parent = Player:WaitForChild("PlayerGui") sg.ResetOnSpawn = false sg.IgnoreGuiInset = true end
     local cam = workspace.CurrentCamera 
     local fovPx = (AimbotSettings.FOV / 90) * (cam.ViewportSize.Y / 2) * 2.5
-    -- Точный центр экрана
     local screenCenterX = cam.ViewportSize.X / 2
     local screenCenterY = cam.ViewportSize.Y / 2
     local circle = Instance.new("Frame") 
     circle.Name = "FOVCircle" 
-    circle.AnchorPoint = Vector2.new(0.5, 0.5) -- Якорь в центре
+    circle.AnchorPoint = Vector2.new(0.5, 0.5)
     circle.Size = UDim2.new(0, fovPx*2, 0, fovPx*2) 
-    circle.Position = UDim2.new(0, screenCenterX, 0, screenCenterY) -- Точный центр
+    circle.Position = UDim2.new(0, screenCenterX, 0, screenCenterY)
     circle.BackgroundColor3 = Color3.fromRGB(255,0,0) 
     circle.BackgroundTransparency = 0.8 
     circle.BorderSizePixel = 0 
@@ -416,9 +415,9 @@ local function CreateMenu()
     local CloseBtn = Instance.new("TextButton") CloseBtn.Size = UDim2.new(0,35,0,30) CloseBtn.Position = UDim2.new(1,-45,0.5,-15) CloseBtn.BackgroundColor3 = C.Off CloseBtn.BorderSizePixel = 0 CloseBtn.Text = "X" CloseBtn.TextColor3 = C.Bright CloseBtn.Font = Enum.Font.Code CloseBtn.TextSize = 14 CloseBtn.AutoButtonColor = false CloseBtn.ZIndex = 4 CloseBtn.Parent = Header
     CloseBtn.MouseButton1Click:Connect(function() Menu:Destroy() end) KillBtn.MouseButton1Click:Connect(function() Menu:Destroy() end)
     local TabPanel = Instance.new("Frame") TabPanel.Size = UDim2.new(1,0,0,TabHeight) TabPanel.Position = UDim2.new(0,0,0,HeaderHeight) TabPanel.BackgroundColor3 = C.Tab TabPanel.BorderSizePixel = 0 TabPanel.ZIndex = 3 TabPanel.Parent = MF
-    local Tabs = {"ESP","AIMBOT","MISC","AUTO","PLAYER","SCRIPT","PHON"}
+    local Tabs = {"ESP","AIMBOT","MISC","AUTO","PLAYER","SCRIPT","SETTINGS","PHON"}
     for i, tabName in ipairs(Tabs) do
-        local TabBtn = Instance.new("TextButton") TabBtn.Size = UDim2.new(1/7,-4,0,TabHeight-8) TabBtn.Position = UDim2.new((i-1)/7,2,0,4) TabBtn.BackgroundColor3 = i==1 and C.TabActive or C.Tab TabBtn.BorderSizePixel = 0 TabBtn.Text = tabName TabBtn.TextColor3 = i==1 and C.Bright or C.Text TabBtn.Font = Enum.Font.Code TabBtn.TextSize = 11 TabBtn.AutoButtonColor = false TabBtn.ZIndex = 4 TabBtn.Parent = TabPanel
+        local TabBtn = Instance.new("TextButton") TabBtn.Size = UDim2.new(1/8,-4,0,TabHeight-8) TabBtn.Position = UDim2.new((i-1)/8,2,0,4) TabBtn.BackgroundColor3 = i==1 and C.TabActive or C.Tab TabBtn.BorderSizePixel = 0 TabBtn.Text = tabName TabBtn.TextColor3 = i==1 and C.Bright or C.Text TabBtn.Font = Enum.Font.Code TabBtn.TextSize = 11 TabBtn.AutoButtonColor = false TabBtn.ZIndex = 4 TabBtn.Parent = TabPanel
         local TabCorner = Instance.new("UICorner") TabCorner.CornerRadius = UDim.new(0,5) TabCorner.Parent = TabBtn
         TabBtn.MouseButton1Click:Connect(function() Menu:SwitchTab(tabName) end)
         Menu.TabButtons[tabName] = TabBtn
@@ -451,7 +450,7 @@ function Menu:SwitchTab(tabName)
     for name, btn in pairs(self.TabButtons) do if name == tabName then btn.BackgroundColor3 = C.TabActive btn.TextColor3 = C.Bright else btn.BackgroundColor3 = C.Tab btn.TextColor3 = C.Text end end
     if self.ItemsContainer then for _, c in pairs(self.ItemsContainer:GetChildren()) do c:Destroy() end end
     self.Items = {} self.AllItems = {}
-    if tabName == "ESP" then self:AddESPItems() elseif tabName == "AIMBOT" then self:AddAimbotItems() elseif tabName == "MISC" then self:AddMiscItems() elseif tabName == "AUTO" then self:AddAutoItems() elseif tabName == "PLAYER" then self:AddPlayerItems() elseif tabName == "SCRIPT" then self:AddScriptItems() elseif tabName == "PHON" then self:AddPhonItems() end
+    if tabName == "ESP" then self:AddESPItems() elseif tabName == "AIMBOT" then self:AddAimbotItems() elseif tabName == "MISC" then self:AddMiscItems() elseif tabName == "AUTO" then self:AddAutoItems() elseif tabName == "PLAYER" then self:AddPlayerItems() elseif tabName == "SCRIPT" then self:AddScriptItems() elseif tabName == "SETTINGS" then self:AddSettingsItems() elseif tabName == "PHON" then self:AddPhonItems() end
     self:UpdateSize()
 end
 
@@ -617,6 +616,61 @@ function Menu:AddScriptItems()
     end)
     local item = {Frame = Frame, Height = ItemHeight, ToggleFunction = function() end, SetState = function() end, GetState = function() return false end}
     table.insert(self.Items, item) table.insert(self.AllItems, item) self:UpdateSize()
+end
+
+
+
+function Menu:AddSettingsItems()
+    -- 📏 Размер меню
+    local SizeFrame = Instance.new("Frame")
+    SizeFrame.Size = UDim2.new(1, -20, 0, 170)
+    SizeFrame.Position = UDim2.new(0, 10, 0, 5)
+    SizeFrame.BackgroundColor3 = C.Item
+    SizeFrame.BorderSizePixel = 0
+    SizeFrame.ZIndex = 3
+    SizeFrame.Parent = self.ItemsContainer
+
+    local SizeCorner = Instance.new("UICorner")
+    SizeCorner.CornerRadius = UDim.new(0, 5)
+    SizeCorner.Parent = SizeFrame
+
+    local SizeTitle = Instance.new("TextLabel")
+    SizeTitle.Size = UDim2.new(1, -30, 0, 25)
+    SizeTitle.Position = UDim2.new(0, 15, 0, 5)
+    SizeTitle.BackgroundTransparency = 1
+    SizeTitle.Text = "📏 Размер меню"
+    SizeTitle.TextColor3 = C.Bright
+    SizeTitle.Font = Enum.Font.Code
+    SizeTitle.TextSize = 16
+    SizeTitle.TextXAlignment = Enum.TextXAlignment.Left
+    SizeTitle.ZIndex = 4
+    SizeTitle.Parent = SizeFrame
+
+    CreateSliderInExpand(SizeFrame, "Ширина (X)", 400, 800, MenuWidth, 35, function(v)
+        MenuWidth = v
+        self:UpdateSize()
+    end)
+    
+    CreateSliderInExpand(SizeFrame, "Высота (Y)", 400, 800, MaxVisibleHeight, 75, function(v)
+        MaxVisibleHeight = v
+        self:UpdateSize()
+    end)
+
+    CreateSliderInExpand(SizeFrame, "Прозрачность", 0, 90, 0, 115, function(v)
+        self.MainFrame.BackgroundTransparency = v / 100
+    end)
+
+    local sizeItem = {
+        Frame = SizeFrame, 
+        Height = 170, 
+        ToggleFunction = function() end, 
+        SetState = function() end, 
+        GetState = function() return false end
+    }
+    table.insert(self.Items, sizeItem)
+    table.insert(self.AllItems, sizeItem)
+
+    self:UpdateSize()
 end
 
 function Menu:AddPhonItems()
