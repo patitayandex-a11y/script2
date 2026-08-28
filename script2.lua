@@ -1,6 +1,6 @@
 -- // ПОЛНЫЙ КОД С ПЕРЕТАСКИВАЕМЫМИ PHON КНОПКАМИ И ВКЛАДКОЙ SETTINGS
 -- // BoatHelper - Premium Dark-Gray Menu with Beautiful UI and All Functions + FPS Window + Binds + PHON + Menu Button
--- // ИСПРАВЛЕНО ПЕРЕТАСКИВАНИЕ ДЛЯ ТЕЛЕФОНОВ
+-- // AUTOFARM ИЗ ПЕРВОГО СКРИПТА
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
@@ -107,7 +107,6 @@ local NotificationSystem = {
         TextLabel.ZIndex = 1000
         TextLabel.Parent = Frame
         
-        -- Анимация появления
         Frame:TweenPosition(
             UDim2.new(1, -260, 1, -70 - (#NotificationSystem.Active * 70)),
             Enum.EasingDirection.Out,
@@ -254,7 +253,7 @@ function Tracers:UpdateTracers()
     end end
 end
 
--- Aimbot
+-- Aimbot Functions
 function GetTargetPart(char, bone)
     if bone == "Head" then return char:FindFirstChild("Head")
     elseif bone == "Neck" then return char:FindFirstChild("Neck") or char:FindFirstChild("UpperTorso")
@@ -347,8 +346,6 @@ function UpdateAimbot()
         local tp = target.Part.Position 
         local lookAt = CFrame.lookAt(cam.CFrame.Position, tp) 
         cam.CFrame = cam.CFrame:Lerp(lookAt, AimbotSettings.Smooth/100) 
-        
-        -- RCS (Recoil Control System)
         if AimbotSettings.RCSEnabled then
             local recoil = AimbotSettings.RCSStrength * 0.1
             cam.CFrame = cam.CFrame * CFrame.Angles(math.rad(recoil), 0, 0)
@@ -359,7 +356,7 @@ end
 function EnableAimbot() if AimbotSettings.Enabled then return end AimbotSettings.Enabled = true Settings.Aimbot.Enabled = true SaveAllSettings() CreateFOVCircle() AimbotSettings.Connection = RunService.RenderStepped:Connect(UpdateAimbot) NotificationSystem.Create("BoatHelper", "Aimbot включен", 2) end
 function DisableAimbot() if not AimbotSettings.Enabled then return end AimbotSettings.Enabled = false Settings.Aimbot.Enabled = false SaveAllSettings() if AimbotSettings.Connection then AimbotSettings.Connection:Disconnect() end if AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() AimbotSettings.FOVCircle = nil end NotificationSystem.Create("BoatHelper", "Aimbot выключен", 2) end
 
--- Fly
+-- Fly System
 function FlySystem:Enable()
     if self.Enabled then return end self.Enabled = true Settings.MISC.Fly.Enabled = true SaveAllSettings()
     local char = Player.Character local hum = char and char:FindFirstChild("Humanoid") if hum then hum.PlatformStand = true end
@@ -406,13 +403,12 @@ function PlayerMods:Apply()
     end
     workspace.CurrentCamera.FieldOfView = self.FOV
 end
-
 function PlayerMods:SetWalkSpeed(v) self.WalkSpeed = v Settings.PLAYER.WalkSpeed = v SaveAllSettings() self:Apply() end
 function PlayerMods:SetJumpPower(v) self.JumpPower = v Settings.PLAYER.JumpPower = v SaveAllSettings() self:Apply() end
 function PlayerMods:SetFOV(v) self.FOV = v Settings.PLAYER.FOV = v SaveAllSettings() self:Apply() end
 function PlayerMods:SetInfiniteJump(v) self.InfiniteJump = v Settings.PLAYER.InfiniteJump = v SaveAllSettings() self:Apply() end
 
--- AutoFarm
+-- AutoFarm (ИЗ ПЕРВОГО СКРИПТА)
 function AutoFarm:Enable()
     if self.Enabled then return end 
     self.Enabled = true 
@@ -423,7 +419,7 @@ function AutoFarm:Enable()
     self.IsWalking = true 
     self.WalkTimer = 0
     
-    NotificationSystem.Create("BoatHelper", "Авто фарм включен", 2)
+    game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Немного хожу перед запуском цикла...", Duration = 3})
     
     task.spawn(function()
         while self.Enabled and self.IsWalking do
@@ -460,7 +456,7 @@ function AutoFarm:Enable()
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) 
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) 
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
-                NotificationSystem.Create("BoatHelper", "Запускаю цикл фарма", 2)
+                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Запускаю цикл фарма!", Duration = 3})
             end
         end
         
@@ -585,8 +581,7 @@ function AutoFarm:Disable()
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) 
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
     if self.Connection then self.Connection:Disconnect() end 
-    workspace.Gravity = 196.2
-    NotificationSystem.Create("BoatHelper", "Авто фарм выключен", 2)
+    workspace.Gravity = 196.2 
 end
 
 -- FPS Window
@@ -618,7 +613,6 @@ local function CreateFPSWindow()
         end
     end)
     
-    -- Перетаскивание для ПК и телефонов
     Frame.InputBegan:Connect(function(input) 
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
             FPSWindow.Dragging = true
@@ -649,7 +643,6 @@ local function CreateMenuButton()
         end 
     end)
     
-    -- Перетаскивание для ПК и телефонов
     btn.InputBegan:Connect(function(input) 
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
             MenuButton.Dragging = true
@@ -691,7 +684,6 @@ local function CreateMenu()
     local ScrollFrame = Instance.new("ScrollingFrame") ScrollFrame.Size = UDim2.new(1,0,1,-HeaderHeight-TabHeight) ScrollFrame.Position = UDim2.new(0,0,0,HeaderHeight+TabHeight) ScrollFrame.BackgroundTransparency = 1 ScrollFrame.BorderSizePixel = 0 ScrollFrame.ZIndex = 3 ScrollFrame.Parent = MF ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y ScrollFrame.ScrollBarThickness = 6 ScrollFrame.ScrollBarImageColor3 = C.ScrollBar ScrollFrame.CanvasSize = UDim2.new(0,0,0,0) ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y ScrollFrame.ScrollBarImageTransparency = 0.3
     Menu.ScrollFrame = ScrollFrame Menu.ItemsContainer = ScrollFrame
     
-    -- Перетаскивание меню для ПК и телефонов
     Header.InputBegan:Connect(function(input) 
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
             Menu.Dragging = true
@@ -979,7 +971,6 @@ function Menu:AddPhonItems()
             local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0,8) Corner.Parent = btn
             btn.MouseButton1Click:Connect(function() toggleFunc() btn.BackgroundColor3 = getState() and Color3.fromRGB(0,200,120) or Color3.fromRGB(50,50,65) end)
             
-            -- Перетаскивание для ПК и телефонов
             local dragging = false local dragOffset = Vector2.new(0,0) local lastPosition = nil
             
             btn.InputBegan:Connect(function(input) 
@@ -1063,7 +1054,6 @@ UserInputService.InputBegan:Connect(function(input, gpe)
         end
     end
     
-    -- Горячие клавиши
     local hotkey = Hotkeys[input.KeyCode]
     if hotkey then
         hotkey()
@@ -1081,7 +1071,7 @@ UserInputService.InputBegan:Connect(function(input, gpe)
     end
 end)
 
--- Отслеживание позиции пальца/мыши для перетаскивания
+-- Отслеживание позиции для перетаскивания
 UserInputService.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
         if Menu.Dragging and Menu.LastPosition then
