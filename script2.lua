@@ -1,5 +1,7 @@
 -- // ПОЛНЫЙ КОД С ПЕРЕТАСКИВАЕМЫМИ PHON КНОПКАМИ И ВКЛАДКОЙ SETTINGS
 -- // BoatHelper - Premium Dark-Gray Menu with Beautiful UI and All Functions + FPS Window + Binds + PHON + Menu Button
+-- // УЛУЧШЕННАЯ ВЕРСИЯ БЕЗ ХИТБОКСОВ И KILL AURA
+
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
 local Mouse = Player:GetMouse()
@@ -8,6 +10,7 @@ local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local HttpService = game:GetService("HttpService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
+local Stats = game:GetService("Stats")
 
 local MenuName = "BoatHelper"
 local MenuWidth = 650
@@ -44,7 +47,82 @@ local Settings = {
     Aimbot = {Enabled = false, TargetBone = "Head", FOV = 180, Smooth = 15, RCSEnabled = false, RCSStrength = 0.5, ShowFOV = true, VisibleCheck = true, TeamCheck = true, TargetPriority = "Distance", Expanded = false},
     MISC = {Fly = {Enabled = false, Speed = 50, Expanded = false}, Noclip = false, SpeedHack = {Enabled = false, Multiplier = 2, Expanded = false}, FullBright = false},
     AUTO = {AutoFarm = false},
-    PHON = {ESPKey = false, AimbotKey = false, FlyKey = false, NoclipKey = false, SpeedKey = false, AutoFarmKey = false}
+    PHON = {ESPKey = false, AimbotKey = false, FlyKey = false, NoclipKey = false, SpeedKey = false, AutoFarmKey = false},
+    PLAYER = {WalkSpeed = 16, JumpPower = 50, FOV = 70, InfiniteJump = false},
+    SCRIPT = {InfiniteYieldEnabled = false},
+}
+
+-- Система уведомлений
+local NotificationSystem = {
+    Active = {},
+    Create = function(title, text, duration)
+        local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("Notifications")
+        if not SG then
+            SG = Instance.new("ScreenGui")
+            SG.Name = "Notifications"
+            SG.Parent = Player:WaitForChild("PlayerGui")
+            SG.ResetOnSpawn = false
+            SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+        end
+        
+        local Frame = Instance.new("Frame")
+        Frame.Size = UDim2.new(0, 250, 0, 60)
+        Frame.Position = UDim2.new(1, 260, 1, -70 - (#NotificationSystem.Active * 70))
+        Frame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+        Frame.BorderSizePixel = 0
+        Frame.ZIndex = 999
+        Frame.Parent = SG
+        
+        local Corner = Instance.new("UICorner")
+        Corner.CornerRadius = UDim.new(0, 5)
+        Corner.Parent = Frame
+        
+        local TitleLabel = Instance.new("TextLabel")
+        TitleLabel.Size = UDim2.new(1, -20, 0, 25)
+        TitleLabel.Position = UDim2.new(0, 10, 0, 5)
+        TitleLabel.BackgroundTransparency = 1
+        TitleLabel.Text = title
+        TitleLabel.TextColor3 = Color3.fromRGB(0, 200, 120)
+        TitleLabel.Font = Enum.Font.Code
+        TitleLabel.TextSize = 14
+        TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TitleLabel.ZIndex = 1000
+        TitleLabel.Parent = Frame
+        
+        local TextLabel = Instance.new("TextLabel")
+        TextLabel.Size = UDim2.new(1, -20, 0, 25)
+        TextLabel.Position = UDim2.new(0, 10, 0, 30)
+        TextLabel.BackgroundTransparency = 1
+        TextLabel.Text = text
+        TextLabel.TextColor3 = Color3.fromRGB(170, 170, 190)
+        TextLabel.Font = Enum.Font.Code
+        TextLabel.TextSize = 11
+        TextLabel.TextXAlignment = Enum.TextXAlignment.Left
+        TextLabel.ZIndex = 1000
+        TextLabel.Parent = Frame
+        
+        -- Анимация появления
+        Frame:TweenPosition(
+            UDim2.new(1, -260, 1, -70 - (#NotificationSystem.Active * 70)),
+            Enum.EasingDirection.Out,
+            Enum.EasingStyle.Quad,
+            0.3
+        )
+        
+        table.insert(NotificationSystem.Active, Frame)
+        
+        task.delay(duration or 3, function()
+            Frame:TweenPosition(
+                UDim2.new(1, 260, Frame.Position.Y.Scale, Frame.Position.Y.Offset),
+                Enum.EasingDirection.In,
+                Enum.EasingStyle.Quad,
+                0.3
+            )
+            task.wait(0.3)
+            Frame:Destroy()
+            table.remove(NotificationSystem.Active, 1)
+        end)
+    end
 }
 
 local function SaveAllSettings()
@@ -75,7 +153,7 @@ local TabStates = {
     AIMBOT = {AimbotEnabled = Settings.Aimbot.Enabled, AimbotExpanded = Settings.Aimbot.Expanded},
     MISC = {FlyEnabled = Settings.MISC.Fly.Enabled, FlySpeed = Settings.MISC.Fly.Speed, FlyExpanded = Settings.MISC.Fly.Expanded, SpeedHackMultiplier = Settings.MISC.SpeedHack.Multiplier, SpeedHackExpanded = Settings.MISC.SpeedHack.Expanded},
     AUTO = {AutoFarmEnabled = Settings.AUTO.AutoFarm, AutoFarmExpanded = false},
-    PLAYER = {},
+    PLAYER = {WalkSpeed = Settings.PLAYER.WalkSpeed, JumpPower = Settings.PLAYER.JumpPower, FOV = Settings.PLAYER.FOV, InfiniteJump = Settings.PLAYER.InfiniteJump, Expanded = false},
     SCRIPT = {InfiniteYieldEnabled = false},
     PHON = {ESPKey = Settings.PHON.ESPKey, AimbotKey = Settings.PHON.AimbotKey, FlyKey = Settings.PHON.FlyKey, NoclipKey = Settings.PHON.NoclipKey, SpeedKey = Settings.PHON.SpeedKey, AutoFarmKey = Settings.PHON.AutoFarmKey},
 }
@@ -88,6 +166,7 @@ local Noclip = {Enabled = Settings.MISC.Noclip, Connection = nil}
 local SpeedHack = {Enabled = Settings.MISC.SpeedHack.Enabled, Multiplier = Settings.MISC.SpeedHack.Multiplier, OriginalSpeed = 16}
 local FullBright = {Enabled = Settings.MISC.FullBright, OriginalBrightness = 2, OriginalClockTime = 14, OriginalAmbient = nil}
 local AutoFarm = {Enabled = Settings.AUTO.AutoFarm, Connection = nil, CurrentStage = 1, IsTeleporting = false, IsWalking = false, WalkTimer = 0}
+local PlayerMods = {WalkSpeed = Settings.PLAYER.WalkSpeed, JumpPower = Settings.PLAYER.JumpPower, FOV = Settings.PLAYER.FOV, InfiniteJump = Settings.PLAYER.InfiniteJump, OriginalWalkSpeed = 16, OriginalJumpPower = 50, OriginalFOV = 70}
 local FPSWindow = {Gui = nil, Frame = nil, Dragging = false, DragOffset = Vector2.new(0,0)}
 local MenuButton = {Gui = nil, Button = nil, Dragging = false, DragOffset = Vector2.new(0,0)}
 
@@ -181,6 +260,7 @@ function GetTargetPart(char, bone)
     end
     return char:FindFirstChild("Head")
 end
+
 function IsTargetVisible(tp)
     if not AimbotSettings.VisibleCheck then return true end
     local pc = Player.Character local ph = pc and pc:FindFirstChild("Head") if not ph then return true end
@@ -190,6 +270,7 @@ function IsTargetVisible(tp)
     if result then local tm = tp:FindFirstAncestorOfClass("Model") if tm and result.Instance:IsDescendantOf(tm) then return true end return false end
     return true
 end
+
 function GetValidTargets()
     local targets = {}
     for _, p in pairs(Players:GetPlayers()) do if p ~= Player then
@@ -199,10 +280,11 @@ function GetValidTargets()
         if AimbotSettings.TeamCheck and p.Team == Player.Team then continue end
         local tp = GetTargetPart(char, AimbotSettings.TargetBone) if not tp then continue end
         if AimbotSettings.VisibleCheck and not IsTargetVisible(tp) then continue end
-        table.insert(targets, {Part = tp, Humanoid = hum})
+        table.insert(targets, {Part = tp, Humanoid = hum, Player = p})
     end end
     return targets
 end
+
 function SelectBestTarget()
     local targets = GetValidTargets() 
     if #targets == 0 then return nil end
@@ -226,6 +308,7 @@ function SelectBestTarget()
     end 
     return best
 end
+
 function CreateFOVCircle()
     if AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() end
     if not AimbotSettings.ShowFOV then return end
@@ -249,13 +332,26 @@ function CreateFOVCircle()
     local stroke = Instance.new("UIStroke") stroke.Color = Color3.fromRGB(255,0,0) stroke.Thickness = 2 stroke.Transparency = 0.5 stroke.Parent = circle
     AimbotSettings.FOVCircle = circle
 end
+
 function UpdateAimbot()
     if not AimbotSettings.Enabled then return end
     local target = SelectBestTarget()
-    if target then local cam = workspace.CurrentCamera local tp = target.Part.Position local lookAt = CFrame.lookAt(cam.CFrame.Position, tp) cam.CFrame = cam.CFrame:Lerp(lookAt, AimbotSettings.Smooth/100) end
+    if target then 
+        local cam = workspace.CurrentCamera 
+        local tp = target.Part.Position 
+        local lookAt = CFrame.lookAt(cam.CFrame.Position, tp) 
+        cam.CFrame = cam.CFrame:Lerp(lookAt, AimbotSettings.Smooth/100) 
+        
+        -- RCS (Recoil Control System)
+        if AimbotSettings.RCSEnabled then
+            local recoil = AimbotSettings.RCSStrength * 0.1
+            cam.CFrame = cam.CFrame * CFrame.Angles(math.rad(recoil), 0, 0)
+        end
+    end
 end
-function EnableAimbot() if AimbotSettings.Enabled then return end AimbotSettings.Enabled = true Settings.Aimbot.Enabled = true SaveAllSettings() CreateFOVCircle() AimbotSettings.Connection = RunService.RenderStepped:Connect(UpdateAimbot) end
-function DisableAimbot() if not AimbotSettings.Enabled then return end AimbotSettings.Enabled = false Settings.Aimbot.Enabled = false SaveAllSettings() if AimbotSettings.Connection then AimbotSettings.Connection:Disconnect() end if AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() AimbotSettings.FOVCircle = nil end end
+
+function EnableAimbot() if AimbotSettings.Enabled then return end AimbotSettings.Enabled = true Settings.Aimbot.Enabled = true SaveAllSettings() CreateFOVCircle() AimbotSettings.Connection = RunService.RenderStepped:Connect(UpdateAimbot) NotificationSystem.Create("BoatHelper", "Aimbot включен", 2) end
+function DisableAimbot() if not AimbotSettings.Enabled then return end AimbotSettings.Enabled = false Settings.Aimbot.Enabled = false SaveAllSettings() if AimbotSettings.Connection then AimbotSettings.Connection:Disconnect() end if AimbotSettings.FOVCircle then AimbotSettings.FOVCircle:Destroy() AimbotSettings.FOVCircle = nil end NotificationSystem.Create("BoatHelper", "Aimbot выключен", 2) end
 
 -- Fly
 function FlySystem:Enable()
@@ -275,21 +371,40 @@ function FlySystem:Enable()
             if dir.Magnitude > 0 then root.Velocity = dir.Unit * self.Speed else root.Velocity = Vector3.new(0,0,0) end
         end
     end)
+    NotificationSystem.Create("BoatHelper", "Полёт включен", 2)
 end
-function FlySystem:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.Fly.Enabled = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end local char = Player.Character local hum = char and char:FindFirstChild("Humanoid") if hum then hum.PlatformStand = false end end
+function FlySystem:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.Fly.Enabled = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end local char = Player.Character local hum = char and char:FindFirstChild("Humanoid") if hum then hum.PlatformStand = false end NotificationSystem.Create("BoatHelper", "Полёт выключен", 2) end
 function FlySystem:SetSpeed(s) self.Speed = s Settings.MISC.Fly.Speed = s SaveAllSettings() end
 
 -- Noclip
-function Noclip:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.Noclip = true SaveAllSettings() self.Connection = RunService.Stepped:Connect(function() if not self.Enabled then return end local char = Player.Character if char then for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end end) end
-function Noclip:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.Noclip = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end local char = Player.Character if char then for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end end end
+function Noclip:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.Noclip = true SaveAllSettings() self.Connection = RunService.Stepped:Connect(function() if not self.Enabled then return end local char = Player.Character if char then for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = false end end end end) NotificationSystem.Create("BoatHelper", "Noclip включен", 2) end
+function Noclip:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.Noclip = false SaveAllSettings() if self.Connection then self.Connection:Disconnect() end local char = Player.Character if char then for _, p in pairs(char:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide = true end end end NotificationSystem.Create("BoatHelper", "Noclip выключен", 2) end
 
 -- SpeedHack
-function SpeedHack:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.SpeedHack.Enabled = true SaveAllSettings() local hum = Player.Character and Player.Character:FindFirstChild("Humanoid") if hum then self.OriginalSpeed = hum.WalkSpeed hum.WalkSpeed = self.OriginalSpeed * self.Multiplier end end
-function SpeedHack:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.SpeedHack.Enabled = false SaveAllSettings() local hum = Player.Character and Player.Character:FindFirstChild("Humanoid") if hum and self.OriginalSpeed then hum.WalkSpeed = self.OriginalSpeed end end
+function SpeedHack:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.SpeedHack.Enabled = true SaveAllSettings() local hum = Player.Character and Player.Character:FindFirstChild("Humanoid") if hum then self.OriginalSpeed = hum.WalkSpeed hum.WalkSpeed = self.OriginalSpeed * self.Multiplier end NotificationSystem.Create("BoatHelper", "Speed Hack включен", 2) end
+function SpeedHack:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.SpeedHack.Enabled = false SaveAllSettings() local hum = Player.Character and Player.Character:FindFirstChild("Humanoid") if hum and self.OriginalSpeed then hum.WalkSpeed = self.OriginalSpeed end NotificationSystem.Create("BoatHelper", "Speed Hack выключен", 2) end
 
 -- FullBright
-function FullBright:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.FullBright = true SaveAllSettings() local L = game:GetService("Lighting") self.OriginalBrightness = L.Brightness self.OriginalClockTime = L.ClockTime self.OriginalAmbient = L.Ambient L.Brightness = 3 L.ClockTime = 12 L.Ambient = Color3.fromRGB(255,255,255) L.FogEnd = 100000 L.GlobalShadows = false end
-function FullBright:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.FullBright = false SaveAllSettings() local L = game:GetService("Lighting") L.Brightness = self.OriginalBrightness L.ClockTime = self.OriginalClockTime L.Ambient = self.OriginalAmbient or Color3.fromRGB(0,0,0) L.GlobalShadows = true end
+function FullBright:Enable() if self.Enabled then return end self.Enabled = true Settings.MISC.FullBright = true SaveAllSettings() local L = game:GetService("Lighting") self.OriginalBrightness = L.Brightness self.OriginalClockTime = L.ClockTime self.OriginalAmbient = L.Ambient L.Brightness = 3 L.ClockTime = 12 L.Ambient = Color3.fromRGB(255,255,255) L.FogEnd = 100000 L.GlobalShadows = false NotificationSystem.Create("BoatHelper", "Full Bright включен", 2) end
+function FullBright:Disable() if not self.Enabled then return end self.Enabled = false Settings.MISC.FullBright = false SaveAllSettings() local L = game:GetService("Lighting") L.Brightness = self.OriginalBrightness L.ClockTime = self.OriginalClockTime L.Ambient = self.OriginalAmbient or Color3.fromRGB(0,0,0) L.GlobalShadows = true NotificationSystem.Create("BoatHelper", "Full Bright выключен", 2) end
+
+-- Player Mods
+function PlayerMods:Apply()
+    local hum = Player.Character and Player.Character:FindFirstChild("Humanoid")
+    if hum then
+        hum.WalkSpeed = self.WalkSpeed
+        hum.JumpPower = self.JumpPower
+        if self.InfiniteJump then
+            hum:SetStateEnabled(Enum.HumanoidStateType.Jumping, true)
+        end
+    end
+    workspace.CurrentCamera.FieldOfView = self.FOV
+end
+
+function PlayerMods:SetWalkSpeed(v) self.WalkSpeed = v Settings.PLAYER.WalkSpeed = v SaveAllSettings() self:Apply() end
+function PlayerMods:SetJumpPower(v) self.JumpPower = v Settings.PLAYER.JumpPower = v SaveAllSettings() self:Apply() end
+function PlayerMods:SetFOV(v) self.FOV = v Settings.PLAYER.FOV = v SaveAllSettings() self:Apply() end
+function PlayerMods:SetInfiniteJump(v) self.InfiniteJump = v Settings.PLAYER.InfiniteJump = v SaveAllSettings() self:Apply() end
 
 -- AutoFarm
 function AutoFarm:Enable()
@@ -302,7 +417,7 @@ function AutoFarm:Enable()
     self.IsWalking = true 
     self.WalkTimer = 0
     
-    game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Немного хожу перед запуском цикла...", Duration = 3})
+    NotificationSystem.Create("BoatHelper", "Авто фарм включен", 2)
     
     task.spawn(function()
         while self.Enabled and self.IsWalking do
@@ -339,7 +454,7 @@ function AutoFarm:Enable()
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.A, false, game) 
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) 
                 VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
-                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Запускаю цикл фарма!", Duration = 3})
+                NotificationSystem.Create("BoatHelper", "Запускаю цикл фарма", 2)
             end
         end
         
@@ -362,10 +477,9 @@ function AutoFarm:Enable()
             else
                 local chest = self:FindGoldenChest()
                 if chest then
-                    -- Включаем гравитацию ДО телепортации к сундуку
                     workspace.Gravity = 196.2
                     root.CFrame = chest.CFrame + Vector3.new(0,5,0)
-                    task.wait(2) -- Ждем пока персонаж упадет
+                    task.wait(2)
                     
                     local trigger = chest:FindFirstChild("Trigger")
                     if trigger and trigger:IsA("BasePart") then 
@@ -465,16 +579,39 @@ function AutoFarm:Disable()
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.S, false, game) 
     VirtualInputManager:SendKeyEvent(false, Enum.KeyCode.D, false, game)
     if self.Connection then self.Connection:Disconnect() end 
-    workspace.Gravity = 196.2 
+    workspace.Gravity = 196.2
+    NotificationSystem.Create("BoatHelper", "Авто фарм выключен", 2)
 end
 
 -- FPS Window
 local function CreateFPSWindow()
     local SG = Instance.new("ScreenGui") SG.Name = "FPSWindow" SG.Parent = Player:WaitForChild("PlayerGui") SG.ResetOnSpawn = false
-    local Frame = Instance.new("Frame") Frame.Size = UDim2.new(0, 100, 0, 30) Frame.Position = UDim2.new(0.9, 0, 0.05, 0) Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) Frame.BorderSizePixel = 0 Frame.Parent = SG
-    local Label = Instance.new("TextLabel") Label.Size = UDim2.new(1, 0, 1, 0) Label.BackgroundTransparency = 1 Label.Text = "FPS: 0" Label.TextColor3 = Color3.fromRGB(0, 255, 0) Label.Font = Enum.Font.Code Label.TextSize = 16 Label.Parent = Frame
+    local Frame = Instance.new("Frame") Frame.Size = UDim2.new(0, 100, 0, 45) Frame.Position = UDim2.new(0.9, 0, 0.05, 0) Frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) Frame.BorderSizePixel = 0 Frame.Parent = SG
+    local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0, 5) Corner.Parent = Frame
+    local Label = Instance.new("TextLabel") Label.Size = UDim2.new(1, 0, 0, 20) Label.Position = UDim2.new(0, 0, 0, 5) Label.BackgroundTransparency = 1 Label.Text = "FPS: 0" Label.TextColor3 = Color3.fromRGB(0, 255, 0) Label.Font = Enum.Font.Code Label.TextSize = 14 Label.Parent = Frame
+    local PingLabel = Instance.new("TextLabel") PingLabel.Size = UDim2.new(1, 0, 0, 20) PingLabel.Position = UDim2.new(0, 0, 0, 25) PingLabel.BackgroundTransparency = 1 PingLabel.Text = "Ping: 0ms" PingLabel.TextColor3 = Color3.fromRGB(255, 200, 0) PingLabel.Font = Enum.Font.Code PingLabel.TextSize = 12 PingLabel.Parent = Frame
+    
     local frameCount = 0 local lastTime = os.clock()
-    RunService.RenderStepped:Connect(function() frameCount += 1 local currentTime = os.clock() if currentTime - lastTime >= 1 then Label.Text = "FPS: " .. frameCount frameCount = 0 lastTime = currentTime end end)
+    RunService.RenderStepped:Connect(function() 
+        frameCount += 1 
+        local currentTime = os.clock() 
+        if currentTime - lastTime >= 1 then 
+            Label.Text = "FPS: " .. frameCount 
+            frameCount = 0 
+            lastTime = currentTime 
+        end 
+    end)
+    
+    task.spawn(function()
+        while true do
+            pcall(function()
+                local ping = Stats:GetChildren()[1]:GetChildren()[1]:GetChildren()[1].Value
+                PingLabel.Text = "Ping: " .. math.floor(ping) .. "ms"
+            end)
+            task.wait(1)
+        end
+    end)
+    
     Frame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then FPSWindow.Dragging = true FPSWindow.DragOffset = Vector2.new(Mouse.X - Frame.AbsolutePosition.X, Mouse.Y - Frame.AbsolutePosition.Y) end end)
     Frame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then FPSWindow.Dragging = false end end)
     FPSWindow.Gui = SG FPSWindow.Frame = Frame
@@ -630,6 +767,7 @@ function Menu:AddESPItems()
         CreateToggleInExpand(ef, "Показывать расстояние", ESP.ShowDistance, 45, function(s) ESP:SetShowDistance(s) end)
         CreateToggleInExpand(ef, "Показывать здоровье", ESP.ShowHealth, 85, function(s) ESP:SetShowHealth(s) end)
     end, TabStates.ESP.ESPExpanded, 160)
+    
     self:AddToggleWithExpand("Трасеры", "Линии к игрокам", Tracers.Enabled, function(state)
         if state then Tracers:Enable() else Tracers:Disable() end
     end)
@@ -681,7 +819,13 @@ function Menu:AddAutoItems()
 end
 
 function Menu:AddPlayerItems()
-    local EmptyLabel = Instance.new("TextLabel") EmptyLabel.Size = UDim2.new(1,-20,0,40) EmptyLabel.Position = UDim2.new(0,10,0,10) EmptyLabel.BackgroundTransparency = 1 EmptyLabel.Text = "PLAYER - пусто" EmptyLabel.TextColor3 = C.Text EmptyLabel.Font = Enum.Font.Code EmptyLabel.TextSize = 16 EmptyLabel.ZIndex = 4 EmptyLabel.Parent = self.ItemsContainer
+    self:AddToggleWithExpand("Модификации игрока", "Настройки персонажа", false, nil, function(ef)
+        ef.Size = UDim2.new(1,-30,0,250)
+        CreateSliderInExpand(ef, "Скорость ходьбы", 0, 100, PlayerMods.WalkSpeed, 5, function(v) PlayerMods:SetWalkSpeed(v) end)
+        CreateSliderInExpand(ef, "Сила прыжка", 0, 200, PlayerMods.JumpPower, 50, function(v) PlayerMods:SetJumpPower(v) end)
+        CreateSliderInExpand(ef, "FOV", 30, 120, PlayerMods.FOV, 95, function(v) PlayerMods:SetFOV(v) end)
+        CreateToggleInExpand(ef, "Бесконечный прыжок", PlayerMods.InfiniteJump, 140, function(s) PlayerMods:SetInfiniteJump(s) end)
+    end, false, 250)
 end
 
 function Menu:AddScriptItems()
@@ -697,11 +841,11 @@ function Menu:AddScriptItems()
             local success, err = pcall(function() loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))() end)
             if success then
                 LaunchBtn.Text = "ГОТОВО!" LaunchBtn.BackgroundColor3 = C.On
-                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Infinite Yield успешно запущен!", Duration = 3})
+                NotificationSystem.Create("BoatHelper", "Infinite Yield успешно запущен!", 3)
                 task.wait(2) LaunchBtn.Text = "ЗАПУСК"
             else
                 LaunchBtn.Text = "ОШИБКА!" LaunchBtn.BackgroundColor3 = C.Danger
-                game:GetService("StarterGui"):SetCore("SendNotification", {Title = "BoatHelper", Text = "Не удалось запустить Infinite Yield!", Duration = 5})
+                NotificationSystem.Create("BoatHelper", "Не удалось запустить Infinite Yield!", 5)
                 task.wait(2) LaunchBtn.Text = "ЗАПУСК" LaunchBtn.BackgroundColor3 = C.On
             end
         end)
@@ -711,7 +855,6 @@ function Menu:AddScriptItems()
 end
 
 function Menu:AddSettingsItems()
-    -- 📏 Размер меню
     local SizeFrame = Instance.new("Frame")
     SizeFrame.Size = UDim2.new(1, -20, 0, 170)
     SizeFrame.Position = UDim2.new(0, 10, 0, 5)
@@ -793,6 +936,16 @@ function Menu:Destroy()
     if Menu.Gui then Menu.Gui:Destroy() end
 end
 
+-- Горячие клавиши
+local Hotkeys = {
+    [Enum.KeyCode.F1] = function() if ESP.Enabled then ESP:Disable() else ESP:Enable() end end,
+    [Enum.KeyCode.F2] = function() if AimbotSettings.Enabled then DisableAimbot() else EnableAimbot() end end,
+    [Enum.KeyCode.F3] = function() if FlySystem.Enabled then FlySystem:Disable() else FlySystem:Enable() end end,
+    [Enum.KeyCode.F4] = function() if Noclip.Enabled then Noclip:Disable() else Noclip:Enable() end end,
+    [Enum.KeyCode.F5] = function() if SpeedHack.Enabled then SpeedHack:Disable() else SpeedHack:Enable() end end,
+    [Enum.KeyCode.F6] = function() if AutoFarm.Enabled then AutoFarm:Disable() else AutoFarm:Enable() end end,
+}
+
 -- Инициализация
 if ESP.Enabled then ESP:Enable() end
 if Tracers.Enabled then Tracers:Enable() end
@@ -807,6 +960,7 @@ CreateMenu()
 Menu:SwitchTab("ESP")
 CreateFPSWindow()
 CreateMenuButton()
+PlayerMods:Apply()
 
 UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
@@ -817,6 +971,12 @@ UserInputService.InputBegan:Connect(function(input, gpe)
             Menu:SaveCurrentStates()
             Menu:SwitchTab(Menu.CurrentTab)
         end
+    end
+    
+    -- Горячие клавиши
+    local hotkey = Hotkeys[input.KeyCode]
+    if hotkey then
+        hotkey()
     end
 end)
 
@@ -842,4 +1002,5 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+NotificationSystem.Create("BoatHelper", "Загружено! Нажмите Insert или кнопку B", 5)
 print("[BoatHelper] Загружено! Нажмите Insert или кнопку B")
