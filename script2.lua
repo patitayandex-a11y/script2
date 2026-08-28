@@ -1,6 +1,6 @@
 -- // ПОЛНЫЙ КОД С ПЕРЕТАСКИВАЕМЫМИ PHON КНОПКАМИ И ВКЛАДКОЙ SETTINGS
 -- // BoatHelper - Premium Dark-Gray Menu with Beautiful UI and All Functions + FPS Window + Binds + PHON + Menu Button
--- // УЛУЧШЕННАЯ ВЕРСИЯ БЕЗ ХИТБОКСОВ И KILL AURA
+-- // ИСПРАВЛЕНО ДЛЯ ТЕЛЕФОНОВ - МЕНЮ ОТКРЫВАЕТСЯ
 
 local Players = game:GetService("Players")
 local Player = Players.LocalPlayer
@@ -19,6 +19,12 @@ local TabHeight = 50
 local ItemHeight = 65
 local Spacing = 8
 local MaxVisibleHeight = 650
+
+-- Адаптация размера для телефонов
+if UserInputService.TouchEnabled then
+    MenuWidth = 500
+    MaxVisibleHeight = 500
+end
 
 local C = {
     BG = Color3.fromRGB(18, 18, 22),
@@ -612,21 +618,76 @@ local function CreateFPSWindow()
         end
     end)
     
-    Frame.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then FPSWindow.Dragging = true FPSWindow.DragOffset = Vector2.new(Mouse.X - Frame.AbsolutePosition.X, Mouse.Y - Frame.AbsolutePosition.Y) end end)
-    Frame.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then FPSWindow.Dragging = false end end)
+    -- Перетаскивание для ПК и телефонов
+    local function startDrag(input)
+        FPSWindow.Dragging = true
+        local pos = input.Position
+        FPSWindow.DragOffset = Vector2.new(pos.X - Frame.AbsolutePosition.X, pos.Y - Frame.AbsolutePosition.Y)
+    end
+    
+    local function endDrag(input)
+        FPSWindow.Dragging = false
+    end
+    
+    Frame.InputBegan:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            startDrag(input)
+        end 
+    end)
+    Frame.InputEnded:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            endDrag(input)
+        end 
+    end)
+    
     FPSWindow.Gui = SG FPSWindow.Frame = Frame
 end
 
 -- Menu Button
 local function CreateMenuButton()
     local SG = Instance.new("ScreenGui") SG.Name = "MenuButtonGui" SG.Parent = Player:WaitForChild("PlayerGui") SG.ResetOnSpawn = false SG.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    local btn = Instance.new("TextButton") btn.Name = "MenuButton" btn.Size = UDim2.new(0, 50, 0, 50) btn.Position = UDim2.new(0.95, 0, 0.5, 0) btn.BackgroundColor3 = Color3.fromRGB(0, 200, 120) btn.BorderSizePixel = 0 btn.Text = "B" btn.TextColor3 = Color3.fromRGB(255, 255, 255) btn.Font = Enum.Font.Code btn.TextSize = 20 btn.AutoButtonColor = false btn.Parent = SG
+    local btn = Instance.new("TextButton") btn.Name = "MenuButton" btn.Size = UDim2.new(0, 50, 0, 50) btn.Position = UDim2.new(0.85, 0, 0.85, 0) btn.BackgroundColor3 = Color3.fromRGB(0, 200, 120) btn.BorderSizePixel = 0 btn.Text = "B" btn.TextColor3 = Color3.fromRGB(255, 255, 255) btn.Font = Enum.Font.Code btn.TextSize = 20 btn.AutoButtonColor = false btn.Parent = SG
     local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(1, 0) Corner.Parent = btn
-    btn.MouseButton1Click:Connect(function() if Menu.Gui and Menu.MainFrame then Menu.IsOpen = not Menu.IsOpen Menu.MainFrame.Visible = Menu.IsOpen end end)
-    local dragging = false local dragOffset = Vector2.new(0,0)
-    btn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragOffset = Vector2.new(Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y) end end)
-    btn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-    RunService.RenderStepped:Connect(function() if dragging then btn.Position = UDim2.new(0, Mouse.X - dragOffset.X, 0, Mouse.Y - dragOffset.Y) end end)
+    
+    btn.MouseButton1Click:Connect(function() 
+        if Menu.Gui and Menu.MainFrame then 
+            Menu.IsOpen = not Menu.IsOpen 
+            Menu.MainFrame.Visible = Menu.IsOpen 
+        end 
+    end)
+    
+    -- Перетаскивание для ПК и телефонов
+    local dragging = false 
+    local dragOffset = Vector2.new(0,0)
+    
+    local function startDrag(input)
+        dragging = true
+        local pos = input.Position
+        dragOffset = Vector2.new(pos.X - btn.AbsolutePosition.X, pos.Y - btn.AbsolutePosition.Y)
+    end
+    
+    local function endDrag(input)
+        dragging = false
+    end
+    
+    btn.InputBegan:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            startDrag(input)
+        end 
+    end)
+    btn.InputEnded:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            endDrag(input)
+        end 
+    end)
+    
+    RunService.RenderStepped:Connect(function() 
+        if dragging then 
+            local position = UserInputService:GetMouseLocation()
+            btn.Position = UDim2.new(0, position.X - dragOffset.X, 0, position.Y - dragOffset.Y) 
+        end 
+    end)
+    
     MenuButton.Gui = SG MenuButton.Button = btn
 end
 
@@ -653,8 +714,29 @@ local function CreateMenu()
     end
     local ScrollFrame = Instance.new("ScrollingFrame") ScrollFrame.Size = UDim2.new(1,0,1,-HeaderHeight-TabHeight) ScrollFrame.Position = UDim2.new(0,0,0,HeaderHeight+TabHeight) ScrollFrame.BackgroundTransparency = 1 ScrollFrame.BorderSizePixel = 0 ScrollFrame.ZIndex = 3 ScrollFrame.Parent = MF ScrollFrame.ScrollingDirection = Enum.ScrollingDirection.Y ScrollFrame.ScrollBarThickness = 6 ScrollFrame.ScrollBarImageColor3 = C.ScrollBar ScrollFrame.CanvasSize = UDim2.new(0,0,0,0) ScrollFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y ScrollFrame.ScrollBarImageTransparency = 0.3
     Menu.ScrollFrame = ScrollFrame Menu.ItemsContainer = ScrollFrame
-    Header.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Menu.Dragging = true Menu.DragOffset = Vector2.new(Mouse.X-MF.AbsolutePosition.X, Mouse.Y-MF.AbsolutePosition.Y) end end)
-    Header.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then Menu.Dragging = false end end)
+    
+    -- Перетаскивание меню для ПК и телефонов
+    local function startDragMenu(input)
+        Menu.Dragging = true
+        local pos = input.Position
+        Menu.DragOffset = Vector2.new(pos.X - MF.AbsolutePosition.X, pos.Y - MF.AbsolutePosition.Y)
+    end
+    
+    local function endDragMenu(input)
+        Menu.Dragging = false
+    end
+    
+    Header.InputBegan:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            startDragMenu(input)
+        end 
+    end)
+    Header.InputEnded:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            endDragMenu(input)
+        end 
+    end)
+    
     Menu.Gui = SG Menu.MainFrame = MF
 end
 
@@ -742,10 +824,23 @@ function CreateSliderInExpand(parent, name, min, max, default, yPos, callback)
         Fill.Size = UDim2.new(p,0,1,0) Knob.Position = UDim2.new(p,-7,0.5,-7) SliderName.Text = name..": "..val
         if callback then callback(val) end
     end
-    SliderButton.MouseButton1Down:Connect(function() dragging = true UpdateValue(Mouse.X) end)
-    local ic = UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-    local rc = RunService.RenderStepped:Connect(function() if dragging and Menu.FunctionsEnabled then UpdateValue(Mouse.X) end end)
-    table.insert(Menu.SliderConnections, ic) table.insert(Menu.SliderConnections, rc)
+    SliderButton.InputBegan:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = true 
+            UpdateValue(input.Position.X) 
+        end
+    end)
+    UserInputService.InputEnded:Connect(function(input) 
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+            dragging = false 
+        end 
+    end)
+    RunService.RenderStepped:Connect(function() 
+        if dragging and Menu.FunctionsEnabled then 
+            local mousePos = UserInputService:GetMouseLocation()
+            UpdateValue(mousePos.X) 
+        end 
+    end)
 end
 
 function CreateToggleInExpand(parent, name, default, yPos, callback)
@@ -779,8 +874,7 @@ function Menu:AddAimbotItems()
     end, function(ef)
         ef.Size = UDim2.new(1,-30,0,400)
         local BoneFrame = Instance.new("Frame") BoneFrame.Size = UDim2.new(1,-20,0,40) BoneFrame.Position = UDim2.new(0,10,0,5) BoneFrame.BackgroundColor3 = C.Item BoneFrame.BorderSizePixel = 0 BoneFrame.ZIndex = 4 BoneFrame.Parent = ef
-        local BoneLabel = Instance.new("TextLabel") BoneLabel.Size = UDim2.new(0.5,0,1,0) BoneLabel.Position = UDim2.new(0,10,0,0) BoneLabel.BackgroundTransparency = 1 BoneLabel.Text = "Часть тела" BoneLabel.TextColor3 = C.Bright BoneLabel.Font = Enum.Font.Code BoneLabel.TextSize = 12 BoneLabel.TextXAlignment = Enum.TextXAlignment.Left BoneLabel.ZIndex = 5 BoneLabel.Parent = BoneFrame
-        local BoneBtn = Instance.new("TextButton") BoneBtn.Size = UDim2.new(0,100,0,25) BoneBtn.Position = UDim2.new(0.6,0,0.5,-12) BoneBtn.BackgroundColor3 = C.Accent BoneBtn.BorderSizePixel = 0 BoneBtn.Text = AimbotSettings.TargetBone BoneBtn.TextColor3 = C.Bright BoneBtn.Font = Enum.Font.Code BoneBtn.TextSize = 10 BoneBtn.AutoButtonColor = false BoneBtn.ZIndex = 5 BoneBtn.Parent = BoneFrame
+        local BoneLabel = Instance.new("TextLabel") BoneLabel.Size = UDim2.new(0.5,0,1,0) BoneLabel.Position = UDim2.new(0,10,0,0) BoneLabel.BackgroundTransparency = 1 BoneLabel.Text = "Часть тела" BoneLabel.TextColor3 = C.Bright BoneLabel.Font = Enum.Font.Code BoneLabel.TextSize = 12 BoneLabel.TextXAlignment = Enum.TextXAlignment.Left BoneLabel.ZIndex = 5 BoneLabel.Parent = BoneFrame        local BoneBtn = Instance.new("TextButton") BoneBtn.Size = UDim2.new(0,100,0,25) BoneBtn.Position = UDim2.new(0.6,0,0.5,-12) BoneBtn.BackgroundColor3 = C.Accent BoneBtn.BorderSizePixel = 0 BoneBtn.Text = AimbotSettings.TargetBone BoneBtn.TextColor3 = C.Bright BoneBtn.Font = Enum.Font.Code BoneBtn.TextSize = 10 BoneBtn.AutoButtonColor = false BoneBtn.ZIndex = 5 BoneBtn.Parent = BoneFrame
         local bones = {"Head","Neck","Chest","Closest"} local bi = 1 for i,b in pairs(bones) do if b == AimbotSettings.TargetBone then bi = i end end
         BoneBtn.MouseButton1Click:Connect(function() bi = bi + 1 if bi > #bones then bi = 1 end AimbotSettings.TargetBone = bones[bi] Settings.Aimbot.TargetBone = bones[bi] SaveAllSettings() BoneBtn.Text = bones[bi] end)
         local PF = Instance.new("Frame") PF.Size = UDim2.new(1,-20,0,40) PF.Position = UDim2.new(0,10,0,50) PF.BackgroundColor3 = C.Item PF.BorderSizePixel = 0 PF.ZIndex = 4 PF.Parent = ef
@@ -914,10 +1008,38 @@ function Menu:AddPhonItems()
             local btn = Instance.new("TextButton") btn.Name = btnName btn.Size = UDim2.new(0,70,0,40) btn.Position = UDim2.new(0.85,0,yPos,0) btn.BackgroundColor3 = getState() and Color3.fromRGB(0,200,120) or Color3.fromRGB(50,50,65) btn.BorderSizePixel = 0 btn.Text = text btn.TextColor3 = Color3.fromRGB(240,240,255) btn.Font = Enum.Font.Code btn.TextSize = 12 btn.AutoButtonColor = false btn.Parent = SG
             local Corner = Instance.new("UICorner") Corner.CornerRadius = UDim.new(0,8) Corner.Parent = btn
             btn.MouseButton1Click:Connect(function() toggleFunc() btn.BackgroundColor3 = getState() and Color3.fromRGB(0,200,120) or Color3.fromRGB(50,50,65) end)
+            
+            -- Перетаскивание для ПК и телефонов
             local dragging = false local dragOffset = Vector2.new(0,0)
-            btn.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = true dragOffset = Vector2.new(Mouse.X - btn.AbsolutePosition.X, Mouse.Y - btn.AbsolutePosition.Y) end end)
-            btn.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then dragging = false end end)
-            RunService.RenderStepped:Connect(function() if dragging and btn.Parent then btn.Position = UDim2.new(0, Mouse.X - dragOffset.X, 0, Mouse.Y - dragOffset.Y) end end)
+            
+            local function startDrag(input)
+                dragging = true
+                local pos = input.Position
+                dragOffset = Vector2.new(pos.X - btn.AbsolutePosition.X, pos.Y - btn.AbsolutePosition.Y)
+            end
+            
+            local function endDrag(input)
+                dragging = false
+            end
+            
+            btn.InputBegan:Connect(function(input) 
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+                    startDrag(input)
+                end 
+            end)
+            btn.InputEnded:Connect(function(input) 
+                if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then 
+                    endDrag(input)
+                end 
+            end)
+            
+            RunService.RenderStepped:Connect(function() 
+                if dragging and btn.Parent then 
+                    local position = UserInputService:GetMouseLocation()
+                    btn.Position = UDim2.new(0, position.X - dragOffset.X, 0, position.Y - dragOffset.Y) 
+                end 
+            end)
+            
             return SG
         end
         CreateToggleInExpand(ef, "Кнопка для ESP", TabStates.PHON.ESPKey, 5, function(s) TabStates.PHON.ESPKey = s Settings.PHON.ESPKey = s SaveAllSettings() if s then CreateDraggableButton("ESPKeyGui","ESPKeyBtn","ESP",0.15,function() return ESP.Enabled end,function() if ESP.Enabled then ESP:Disable() else ESP:Enable() end end) else local SG = Player:WaitForChild("PlayerGui"):FindFirstChild("ESPKeyGui") if SG then SG:Destroy() end end end)
@@ -993,14 +1115,16 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if Menu.Dragging and Menu.MainFrame and Menu.FunctionsEnabled then
-        local x = math.clamp(Mouse.X - Menu.DragOffset.X, 0, workspace.CurrentCamera.ViewportSize.X - Menu.MainFrame.AbsoluteSize.X)
-        local y = math.clamp(Mouse.Y - Menu.DragOffset.Y, 0, workspace.CurrentCamera.ViewportSize.Y - Menu.MainFrame.AbsoluteSize.Y)
+        local position = UserInputService:GetMouseLocation()
+        local x = math.clamp(position.X - Menu.DragOffset.X, 0, workspace.CurrentCamera.ViewportSize.X - Menu.MainFrame.AbsoluteSize.X)
+        local y = math.clamp(position.Y - Menu.DragOffset.Y, 0, workspace.CurrentCamera.ViewportSize.Y - Menu.MainFrame.AbsoluteSize.Y)
         Menu.MainFrame.Position = UDim2.new(0,x,0,y)
     end
     if FPSWindow.Dragging and FPSWindow.Frame then
-        FPSWindow.Frame.Position = UDim2.new(0, Mouse.X - FPSWindow.DragOffset.X, 0, Mouse.Y - FPSWindow.DragOffset.Y)
+        local position = UserInputService:GetMouseLocation()
+        FPSWindow.Frame.Position = UDim2.new(0, position.X - FPSWindow.DragOffset.X, 0, position.Y - FPSWindow.DragOffset.Y)
     end
 end)
 
-NotificationSystem.Create("BoatHelper", "Загружено! Нажмите Insert или кнопку B", 5)
-print("[BoatHelper] Загружено! Нажмите Insert или кнопку B")
+NotificationSystem.Create("BoatHelper", "Загружено! Нажмите на кнопку B", 5)
+print("[BoatHelper] Загружено! Нажмите на кнопку B")
